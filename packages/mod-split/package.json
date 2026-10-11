@@ -1,0 +1,14 @@
+{
+    "name": "@pdfkit/mod-split",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./manifest": "./src/manifest.ts"
+    },
+    "dependencies": {
+        "@pdfkit/core": "*",
+        "@cantoo/pdf-lib": "^2.3.0"
+    }
+}
