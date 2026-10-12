@@ -1,6 +1,5 @@
 import "./globals.css";
 import Navbar from "../components/Navbar";
-import Footer from "../components/Footer";
 
 export const metadata = {
   title: "PDFKit",
@@ -19,7 +18,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="site-wrapper">
           <Navbar />
           <main className="main-content">{children}</main>
-          <Footer />
         </div>
       </body>
     </html>
