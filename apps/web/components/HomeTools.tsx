@@ -65,9 +65,12 @@ export default function HomeTools({ manifests }: { manifests: ToolManifest[] }) 
   return (
     <>
       <section className="hero-section">
-        <h1 className="hero-title">PDF Tools</h1>
+        <h1 className="hero-title">
+          Every PDF Tool You Need,{" "}
+          <span style={{ color: "var(--primary)" }}>Free & Online</span>
+        </h1>
         <p className="hero-desc">
-          Merge, split, and rotate PDF files in your browser.
+          Merge, split, rotate and transform your PDF files — fast, private, and all in your browser.
         </p>
       </section>
 
