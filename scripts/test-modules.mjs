@@ -120,6 +120,18 @@ test("mod-split", async (t) => {
     const doc = await PDFDocument.load(results[0].data);
     assert.equal(doc.getPageCount(), 4);
   });
+
+  await t.test("splits by maximum file size", async () => {
+    // 5-page PDF split with small byte budget forces splitting into multiple parts
+    const results = await splitMod.run([
+      { name: "sample.pdf", data: pdf },
+    ], { mode: "size", maxSizeBytes: 1500, allowCompression: true }, ctx);
+
+    assert.ok(results.length >= 2);
+    for (const res of results) {
+      assert.ok(res.data.byteLength > 0);
+    }
+  });
 });
 
 test("mod-rotate", async (t) => {

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
 import { runTool } from "../lib/runTool";
+import { downloadFilesAsZip } from "../lib/downloadZip";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
 
@@ -13,8 +14,13 @@ interface Range {
   to: number | string;
 }
 
-type SplitTab = "range" | "pages";
+type SplitTab = "range" | "pages" | "size";
 type ExtractMode = "all" | "select";
+
+function formatFileSizeExact(b: number): string {
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(2)} KB`;
+  return `${(b / (1024 * 1024)).toFixed(2)} MB`;
+}
 
 /* ── Range row palette ────────────────────────────────────── */
 const RANGE_COLORS = [
@@ -230,6 +236,97 @@ function SelectablePageCard({
   );
 }
 
+/* ── Centered Single Document Preview for Size Mode ───────── */
+function SingleDocumentPreview({ file, onZoom }: { file: File; onZoom: () => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    if (canvasRef.current) {
+      renderPdfPage(file, canvasRef.current, 1, 260).then(() => {
+        if (active) setLoading(false);
+      });
+    }
+    return () => { active = false; };
+  }, [file]);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "3rem 1rem",
+        minHeight: 340,
+      }}
+    >
+      <div
+        style={{
+          width: 180,
+          aspectRatio: "1 / 1.35",
+          background: "#ffffff",
+          border: "1.5px solid var(--border-light)",
+          borderRadius: 8,
+          overflow: "hidden",
+          position: "relative",
+          boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+        }}
+        onClick={onZoom}
+        title="Click to zoom preview"
+      >
+        {loading && (
+          <div className="pdf-thumb-skeleton">
+            <div className="pdf-thumb-spinner" />
+          </div>
+        )}
+        <canvas ref={canvasRef} className="pdf-thumb-canvas" />
+
+        <button
+          type="button"
+          className="split-page-zoom-btn"
+          style={{ position: "absolute", top: 8, right: 8, width: 26, height: 26 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onZoom();
+          }}
+          title="Zoom preview"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <line x1="11" y1="8" x2="11" y2="14" />
+            <line x1="8" y1="11" x2="14" y2="11" />
+          </svg>
+        </button>
+      </div>
+
+      <span
+        style={{
+          fontSize: "0.8125rem",
+          fontWeight: 600,
+          color: "var(--text-secondary)",
+          marginTop: "0.875rem",
+          maxWidth: 240,
+          textAlign: "center",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+        title={file.name}
+      >
+        {file.name}
+      </span>
+    </div>
+  );
+}
+
 /* ── Main Component ───────────────────────────────────────── */
 export default function SplitTool() {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -253,6 +350,24 @@ export default function SplitTool() {
   const [pagesInput, setPagesInput] = useState<string>("");
   const [mergeExtracted, setMergeExtracted] = useState<boolean>(false);
 
+  /* Size mode config */
+  const [sizeValue, setSizeValue] = useState<string>("292");
+  const [sizeUnit, setSizeUnit] = useState<"KB" | "MB">("KB");
+  const [allowCompression, setAllowCompression] = useState<boolean>(true);
+
+  function handleUnitChange(newUnit: "KB" | "MB") {
+    if (newUnit === sizeUnit) return;
+    const curVal = Number(sizeValue) || 0;
+    if (newUnit === "MB") {
+      const mbVal = Math.max(0.1, parseFloat((curVal / 1024).toFixed(2)));
+      setSizeValue(String(mbVal));
+    } else {
+      const kbVal = Math.max(1, Math.round(curVal * 1024));
+      setSizeValue(String(kbVal));
+    }
+    setSizeUnit(newUnit);
+  }
+
   /* Zoom modal state */
   const [zoomPage, setZoomPage] = useState<number | null>(null);
 
@@ -262,10 +377,25 @@ export default function SplitTool() {
   const [error, setError] = useState("");
   const [results, setResults] = useState<{ name: string; url: string; size: number }[]>([]);
   const [cancel, setCancel] = useState<(() => void) | null>(null);
+  const [isZipping, setIsZipping] = useState(false);
   const isRunning = progress !== null;
 
   /* cleanup urls on unmount */
   useEffect(() => () => { results.forEach((r) => URL.revokeObjectURL(r.url)); }, [results]);
+
+  async function handleDownloadAllZip() {
+    if (results.length === 0 || isZipping) return;
+    setIsZipping(true);
+    try {
+      const baseName = file ? file.name.replace(/\.pdf$/i, "") : "split_files";
+      await downloadFilesAsZip(results, `${baseName}_split.zip`);
+    } catch (err: any) {
+      console.error("Failed to generate zip:", err);
+      alert("Failed to generate zip archive: " + (err?.message || "Unknown error"));
+    } finally {
+      setIsZipping(false);
+    }
+  }
 
   /* ── File handling ──────────────────────────────────────── */
   async function loadFile(f: File) {
@@ -288,6 +418,12 @@ export default function SplitTool() {
     setSelectedPages(new Set(initialPages));
     setPagesInput(formatPageRanges(initialPages));
     setExtractMode("select");
+
+    // Initialise size mode defaults based on file size
+    const defaultKb = Math.max(20, Math.round((f.size / 1024) / (n > 1 ? Math.min(n, 3) : 2)));
+    setSizeUnit("KB");
+    setSizeValue(String(defaultKb));
+    setAllowCompression(true);
   }
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -432,9 +568,22 @@ export default function SplitTool() {
     setProgress(0.05);
     setStatusMsg("Reading file…");
 
-    let effectiveOpts: { mode: string; ranges: string; n: number; mergeAll?: boolean };
+    let effectiveOpts: any;
 
-    if (activeTab === "pages") {
+    if (activeTab === "size") {
+      const num = Number(sizeValue);
+      if (!num || num <= 0) {
+        setError("Please enter a valid maximum file size.");
+        setProgress(null);
+        return;
+      }
+      const maxSizeBytes = sizeUnit === "MB" ? Math.round(num * 1024 * 1024) : Math.round(num * 1024);
+      effectiveOpts = {
+        mode: "size",
+        maxSizeBytes,
+        allowCompression,
+      };
+    } else if (activeTab === "pages") {
       const list = Array.from(selectedPages).sort((a, b) => a - b);
       if (list.length === 0) {
         setError("Please select at least one page to extract.");
@@ -510,6 +659,9 @@ export default function SplitTool() {
     setNextId(2);
     setSelectedPages(new Set());
     setPagesInput("");
+    setSizeValue("292");
+    setSizeUnit("KB");
+    setAllowCompression(true);
     setResults([]);
     setError("");
     setProgress(null);
@@ -595,6 +747,33 @@ export default function SplitTool() {
           <strong style={{ color: "#065f46" }}>Split complete — {results.length} file{results.length !== 1 ? "s" : ""} ready</strong>
         </div>
 
+        {activeTab === "size" && results.some((r) => r.size > (sizeUnit === "MB" ? Number(sizeValue) * 1024 * 1024 : Number(sizeValue) * 1024)) && (
+          <div
+            style={{
+              background: "#eff6ff",
+              border: "1.5px solid #bfdbfe",
+              borderRadius: "var(--radius-md)",
+              padding: "0.75rem 1rem",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "0.5rem",
+              marginBottom: "1rem",
+              fontSize: "0.8125rem",
+              color: "#1e40af",
+              lineHeight: 1.45,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" style={{ flexShrink: 0, marginTop: 2 }}>
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <div>
+              <strong>Atomic page notice:</strong> A PDF cannot slice a single page in half. Files larger than {sizeValue} {sizeUnit} contain an individual page whose graphics/diagrams inherently exceed the target size limit.
+            </div>
+          </div>
+        )}
+
         <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
           {results.map((r, i) => (
             <div
@@ -635,14 +814,32 @@ export default function SplitTool() {
           </button>
           {results.length > 1 && (
             <button
-              onClick={() => results.forEach((r) => {
-                const a = document.createElement("a");
-                a.href = r.url; a.download = r.name; a.click();
-              })}
+              onClick={handleDownloadAllZip}
               className="btn-primary"
-              style={{ flex: 1 }}
+              disabled={isZipping}
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem",
+              }}
             >
-              Download All
+              {isZipping ? (
+                <>
+                  <div className="btn-spinner" />
+                  Creating ZIP…
+                </>
+              ) : (
+                <>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="21 8 21 21 3 21 3 8" />
+                    <rect x="1" y="3" width="22" height="5" />
+                    <line x1="10" y1="12" x2="14" y2="12" />
+                  </svg>
+                  Download All (.zip)
+                </>
+              )}
             </button>
           )}
         </div>
@@ -692,6 +889,14 @@ export default function SplitTool() {
                 />
               ))}
             </div>
+          )}
+
+          {/* SIZE TAB PREVIEW: Single centered document card */}
+          {activeTab === "size" && (
+            <SingleDocumentPreview
+              file={file}
+              onZoom={() => setZoomPage(1)}
+            />
           )}
 
           {/* RANGE TAB PREVIEW */}
@@ -828,19 +1033,21 @@ export default function SplitTool() {
               <span>Pages</span>
             </button>
 
-            {/* Size tab (pro placeholder) */}
+            {/* Size tab */}
             <button
-              className="split-mode-tab"
+              className={`split-mode-tab ${activeTab === "size" ? "active" : ""}`}
+              onClick={() => setActiveTab("size")}
               type="button"
-              disabled
-              style={{ opacity: 0.6, cursor: "not-allowed", position: "relative" }}
-              title="Split by file size (Coming soon)"
             >
               <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                <span style={{ fontSize: "0.85rem" }}>👑</span>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="2" y="2" width="20" height="20" rx="3" />
-                  <line x1="2" y1="12" x2="22" y2="12" />
+                {activeTab === "size" && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 16v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1" />
+                  <rect x="8" y="2" width="13" height="14" rx="2" />
                 </svg>
               </div>
               <span>Size</span>
@@ -1062,6 +1269,84 @@ export default function SplitTool() {
             </div>
           )}
 
+          {/* ──────── SIZE MODE CONFIG ──────── */}
+          {activeTab === "size" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                <div>
+                  Original file size:{" "}
+                  <span style={{ fontWeight: 600, color: "var(--text-main)" }}>
+                    {formatFileSizeExact(file.size)}
+                  </span>
+                </div>
+                <div>
+                  Total pages:{" "}
+                  <span style={{ fontWeight: 600, color: "var(--text-main)" }}>
+                    {totalPages}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <label style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-main)" }}>
+                  Maximum size per file:
+                </label>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+                  <input
+                    type="number"
+                    min="1"
+                    step={sizeUnit === "MB" ? "0.1" : "1"}
+                    value={sizeValue}
+                    onChange={(e) => setSizeValue(e.target.value)}
+                    className="split-text-input"
+                    style={{ flex: 1, padding: "0.55rem 0.75rem", fontWeight: 600, fontSize: "0.95rem" }}
+                  />
+                  <div className="size-unit-toggle">
+                    <button
+                      type="button"
+                      className={`size-unit-btn ${sizeUnit === "KB" ? "active" : ""}`}
+                      onClick={() => handleUnitChange("KB")}
+                    >
+                      KB
+                    </button>
+                    <button
+                      type="button"
+                      className={`size-unit-btn ${sizeUnit === "MB" ? "active" : ""}`}
+                      onClick={() => handleUnitChange("MB")}
+                    >
+                      MB
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="split-info-box">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  <span>
+                    This PDF will be split into files no larger than <strong>{sizeValue || 0} {sizeUnit}</strong> each.
+                  </span>
+                  <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
+                    Note: A single page cannot be sliced in half. Any individual page that exceeds this limit on its own will be saved as an atomic 1-page file.
+                  </span>
+                </div>
+              </div>
+
+              <label className="split-merge-check" style={{ alignItems: "center", padding: "0.25rem 0" }}>
+                <input
+                  type="checkbox"
+                  checked={allowCompression}
+                  onChange={(e) => setAllowCompression(e.target.checked)}
+                />
+                <span style={{ fontWeight: 600, color: "var(--text-main)" }}>Allow compression</span>
+              </label>
+            </div>
+          )}
+
           {/* Errors */}
           {error && (
             <div className="alert-error">
@@ -1103,7 +1388,11 @@ export default function SplitTool() {
                 type="button"
                 className="split-run-btn"
                 onClick={run}
-                disabled={!totalPages || (activeTab === "pages" && selectedCount === 0)}
+                disabled={
+                  !totalPages ||
+                  (activeTab === "pages" && selectedCount === 0) ||
+                  (activeTab === "size" && (!sizeValue || Number(sizeValue) <= 0))
+                }
               >
                 Split PDF
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { FieldDef, OutputFile, ToolManifest } from "@pdfkit/core";
 import { runTool } from "../lib/runTool";
+import { downloadFilesAsZip } from "../lib/downloadZip";
 import PdfThumbnailCard from "./PdfThumbnailCard";
 import PdfZoomModal from "./PdfZoomModal";
 
@@ -25,6 +26,7 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
   const [error, setError] = useState("");
   const [results, setResults] = useState<{ name: string; url: string; size: number }[]>([]);
   const [cancel, setCancel] = useState<(() => void) | null>(null);
+  const [isZipping, setIsZipping] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
@@ -39,6 +41,19 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
       results.forEach((r) => URL.revokeObjectURL(r.url));
     };
   }, [results]);
+
+  async function handleDownloadAllZip() {
+    if (results.length === 0 || isZipping) return;
+    setIsZipping(true);
+    try {
+      await downloadFilesAsZip(results, `${manifest.id}_results.zip`);
+    } catch (err: any) {
+      console.error("Failed to generate zip:", err);
+      alert("Failed to generate zip archive: " + (err?.message || "Unknown error"));
+    } finally {
+      setIsZipping(false);
+    }
+  }
 
   function handleFileSelect(selectedFiles: FileList | File[] | null) {
     if (!selectedFiles || selectedFiles.length === 0) return;
@@ -542,18 +557,46 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
       {/* Results / Download Section */}
       {results.length > 0 && (
         <div className="results-card">
-          <div className="results-header">
-            <div className="success-badge">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
+          <div className="results-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
+              <div className="success-badge">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <div>
+                <h3 className="results-title">Output Files</h3>
+                <p className="results-subtitle">
+                  {results.length === 1 ? "1 file ready for download" : `${results.length} files ready for download`}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="results-title">Output Files</h3>
-              <p className="results-subtitle">
-                {results.length === 1 ? "1 file ready for download" : `${results.length} files ready for download`}
-              </p>
-            </div>
+
+            {results.length > 1 && (
+              <button
+                type="button"
+                className="btn-success"
+                onClick={handleDownloadAllZip}
+                disabled={isZipping}
+                style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", padding: "0.5rem 1rem", fontSize: "0.875rem" }}
+              >
+                {isZipping ? (
+                  <>
+                    <div className="btn-spinner" />
+                    Creating ZIP…
+                  </>
+                ) : (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="21 8 21 21 3 21 3 8" />
+                      <rect x="1" y="3" width="22" height="5" />
+                      <line x1="10" y1="12" x2="14" y2="12" />
+                    </svg>
+                    Download All (.zip)
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
           <div className="output-files-grid">
