@@ -5,10 +5,11 @@ import { renderPdfPage } from "../lib/pdfjs";
 
 interface PdfZoomModalProps {
   file: File | null;
+  pageNum?: number;
   onClose: () => void;
 }
 
-export default function PdfZoomModal({ file, onClose }: PdfZoomModalProps) {
+export default function PdfZoomModal({ file, pageNum = 1, onClose }: PdfZoomModalProps) {
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -16,12 +17,12 @@ export default function PdfZoomModal({ file, onClose }: PdfZoomModalProps) {
     if (!file || !canvasRef.current) return;
     setLoading(true);
     try {
-      // Render full first page at high resolution
-      await renderPdfPage(file, canvasRef.current, 1, 1000);
+      // Render page at high resolution
+      await renderPdfPage(file, canvasRef.current, pageNum, 1000);
     } finally {
       setLoading(false);
     }
-  }, [file]);
+  }, [file, pageNum]);
 
   useEffect(() => {
     renderPage();
