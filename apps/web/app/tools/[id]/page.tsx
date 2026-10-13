@@ -59,8 +59,6 @@ export default async function ToolPage({ params }: { params: Promise<{ id: strin
         <nav className="breadcrumb" aria-label="Breadcrumb">
           <Link href="/">Home</Link>
           <span className="breadcrumb-separator">/</span>
-          <span style={{ textTransform: "capitalize" }}>{manifest.category}</span>
-          <span className="breadcrumb-separator">/</span>
           <span style={{ color: "var(--text-main)", fontWeight: 600 }}>{manifest.title}</span>
         </nav>
 

@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import type { FieldDef, OutputFile, ToolManifest } from "@pdfkit/core";
 import { runTool } from "../lib/runTool";
+import PdfThumbnailCard from "./PdfThumbnailCard";
+import PdfZoomModal from "./PdfZoomModal";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -24,6 +26,10 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
   const [results, setResults] = useState<{ name: string; url: string; size: number }[]>([]);
   const [cancel, setCancel] = useState<(() => void) | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [rotatingIdx, setRotatingIdx] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -77,6 +83,74 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
     setResults([]);
     setError("");
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleRotateFile(index: number) {
+    const file = files[index];
+    if (!file || rotatingIdx !== null) return;
+    setRotatingIdx(index);
+    try {
+      const data = new Uint8Array(await file.arrayBuffer());
+      const job = runTool("rotate", [{ name: file.name, data }], { degrees: "90" }, () => {});
+      const [out] = await job.promise;
+      const rotatedFile = new File([out.data as BlobPart], file.name, { type: file.type || "application/pdf" });
+      setFiles((prev) => {
+        const next = [...prev];
+        next[index] = rotatedFile;
+        return next;
+      });
+      // If currently previewing this file in zoom modal, update previewFile too
+      if (previewFile === file) {
+        setPreviewFile(rotatedFile);
+      }
+    } catch (err: any) {
+      console.error("Failed to rotate PDF:", err);
+    } finally {
+      setRotatingIdx(null);
+    }
+  }
+
+  // Card sequence drag-and-drop reordering handlers
+  function handleCardDragStart(e: React.DragEvent, index: number) {
+    setDraggedIdx(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", index.toString());
+  }
+
+  function handleCardDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverIdx !== index) {
+      setDragOverIdx(index);
+    }
+  }
+
+  function handleCardDragEnter(e: React.DragEvent, index: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverIdx(index);
+  }
+
+  function handleCardDragLeave(e: React.DragEvent, index: number) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleCardDrop(e: React.DragEvent, dropIndex: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    const sourceIndex = draggedIdx;
+    if (sourceIndex !== null && sourceIndex !== dropIndex) {
+      moveFile(sourceIndex, dropIndex);
+    }
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+  }
+
+  function handleCardDragEnd() {
+    setDraggedIdx(null);
+    setDragOverIdx(null);
   }
 
   // Drag and drop handlers
@@ -194,24 +268,30 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
           </span>
         </div>
 
-        {/* Selected files list */}
+        {/* Selected files list / preview grid */}
         {files.length > 0 && (
           <div className="files-list-wrapper">
             <div className="files-list-header">
-              <span>
-                Selected Files ({files.length}
-                {manifest.multiple && manifest.id === "merge" ? " • Ordered top to bottom" : ""})
-              </span>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
+              <div className="files-list-title-group">
+                <span className="files-list-title">
+                  Selected Files ({files.length}
+                  {manifest.multiple && manifest.id === "merge" ? " • Merge sequence" : ""})
+                </span>
                 {manifest.multiple && (
-                  <button
-                    type="button"
-                    className="quick-opt-btn"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    + Add More
-                  </button>
+                  <span className="files-list-hint">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="5 9 2 12 5 15" />
+                      <polyline points="9 5 12 2 15 5" />
+                      <polyline points="15 19 12 22 9 19" />
+                      <polyline points="19 9 22 12 19 15" />
+                      <line x1="2" y1="12" x2="22" y2="12" />
+                      <line x1="12" y1="2" x2="12" y2="22" />
+                    </svg>
+                    Drag cards to reorder sequence
+                  </span>
                 )}
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
                 <button
                   type="button"
                   className="quick-opt-btn"
@@ -223,65 +303,28 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
               </div>
             </div>
 
-            <ul className="files-list">
+            <div className="pdf-thumbs-grid">
               {files.map((file, idx) => (
-                <li key={`${file.name}-${idx}`} className="file-item">
-                  <div className="file-info">
-                    {manifest.multiple && (
-                      <span className="file-order-badge" title={`Order: #${idx + 1}`}>
-                        {idx + 1}
-                      </span>
-                    )}
-                    <svg className="file-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                      <polyline points="14 2 14 8 20 8"></polyline>
-                      <line x1="9" y1="13" x2="15" y2="13"></line>
-                      <line x1="9" y1="17" x2="15" y2="17"></line>
-                    </svg>
-                    <div className="file-meta">
-                      <span className="file-name" title={file.name}>
-                        {file.name}
-                      </span>
-                      <span className="file-size">{formatBytes(file.size)}</span>
-                    </div>
-                  </div>
-
-                  <div className="file-actions">
-                    {manifest.multiple && (
-                      <>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          disabled={idx === 0 || isRunning}
-                          onClick={() => moveFile(idx, idx - 1)}
-                          title="Move up in merge sequence"
-                        >
-                          &uarr;
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          disabled={idx === files.length - 1 || isRunning}
-                          onClick={() => moveFile(idx, idx + 1)}
-                          title="Move down in merge sequence"
-                        >
-                          &darr;
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      className="icon-btn delete"
-                      disabled={isRunning}
-                      onClick={() => removeFile(idx)}
-                      title="Remove file"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                </li>
+                <PdfThumbnailCard
+                  key={`${file.name}-${idx}`}
+                  file={file}
+                  index={idx}
+                  isDragging={draggedIdx === idx}
+                  isDropTarget={dragOverIdx === idx && draggedIdx !== idx}
+                  disabled={isRunning}
+                  isRotating={rotatingIdx === idx}
+                  onDragStart={handleCardDragStart}
+                  onDragOver={handleCardDragOver}
+                  onDragEnter={handleCardDragEnter}
+                  onDragLeave={handleCardDragLeave}
+                  onDrop={handleCardDrop}
+                  onDragEnd={handleCardDragEnd}
+                  onZoom={(f) => setPreviewFile(f)}
+                  onRotate={handleRotateFile}
+                  onRemove={removeFile}
+                />
               ))}
-            </ul>
+            </div>
           </div>
         )}
       </div>
@@ -463,12 +506,6 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
               Cancel
             </button>
           )}
-
-          {files.length > 0 && !isRunning && (
-            <button type="button" className="btn-secondary" onClick={clearAllFiles}>
-              Reset
-            </button>
-          )}
         </div>
 
         {/* Progress Display */}
@@ -562,6 +599,12 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
           </div>
         </div>
       )}
+
+      {/* Full-view Zoom Lightbox Modal */}
+      <PdfZoomModal
+        file={previewFile}
+        onClose={() => setPreviewFile(null)}
+      />
     </div>
   );
 }
