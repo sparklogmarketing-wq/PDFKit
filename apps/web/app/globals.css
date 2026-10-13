@@ -1516,15 +1516,13 @@ a {
   }
 }
 
-/* LEFT: scrollable page preview */
+/* LEFT: page preview */
 .split-preview-panel {
   background: #ffffff;
   border: 1.5px solid var(--border-light);
-  border-radius: var(--radius-xl);
+  border-radius: 8px;
   padding: 1.25rem;
   min-height: 360px;
-  max-height: 80vh;
-  overflow-y: auto;
   box-shadow: var(--shadow-sm);
 }
 
@@ -1532,7 +1530,7 @@ a {
 .split-config-panel {
   background: #ffffff;
   border: 1.5px solid var(--border-light);
-  border-radius: var(--radius-xl);
+  border-radius: 8px;
   padding: 1.5rem 1.25rem;
   box-shadow: var(--shadow-md);
   display: flex;
@@ -1791,4 +1789,213 @@ a {
   color: var(--danger);
   font-size: 0.875rem;
   font-weight: 500;
+}
+
+/* ── Pages Mode Styles (iLovePDF Extract Mode) ── */
+
+.split-mode-tabs.three-tabs {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.split-mode-tab-badge {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.85rem;
+}
+
+.split-submode-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.split-submode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.split-submode-btn {
+  padding: 0.65rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-medium);
+  background: #ffffff;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.split-submode-btn:hover:not(.active) {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-subtle);
+}
+
+.split-submode-btn.active {
+  border-color: #dc2626;
+  color: #dc2626;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px #dc2626, 0 2px 8px rgba(220, 38, 38, 0.12);
+  font-weight: 700;
+}
+
+.split-text-input {
+  width: 100%;
+  padding: 0.65rem 0.875rem;
+  border: 1.5px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  color: var(--text-main);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-family: inherit;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.split-text-input:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+}
+
+.split-info-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.875rem 1rem;
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: var(--radius-md);
+  color: #1e40af;
+  font-size: 0.825rem;
+  line-height: 1.45;
+}
+
+.split-info-box svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── Selectable Page Thumbnails Grid ── */
+.split-pages-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 88px));
+  gap: 0.625rem;
+  padding: 0.25rem 0;
+}
+
+@media (min-width: 640px) {
+  .split-pages-grid {
+    grid-template-columns: repeat(auto-fill, minmax(82px, 90px));
+    gap: 0.625rem;
+  }
+}
+
+.split-page-thumb {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid var(--border-light);
+  border-radius: 8px;
+  padding: 0.3rem 0.3rem 0.4rem;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.split-page-thumb:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #cbd5e1;
+}
+
+.split-page-thumb.selected {
+  border-color: #10b981;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px #10b981, 0 4px 12px rgba(16, 185, 129, 0.16);
+}
+
+.split-page-thumb-top {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+  padding: 0 0.05rem;
+}
+
+.split-page-check {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.split-page-check.checked {
+  background: #10b981;
+  border-color: #059669;
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(16, 185, 129, 0.35);
+}
+
+.split-page-zoom-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid #fecaca;
+  background: #ffffff;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.split-page-zoom-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  transform: scale(1.1);
+}
+
+.split-page-sheet {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1.35;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.split-page-num-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  border-radius: 99px;
+  padding: 0.05rem 0.4rem;
+  margin-top: 0.25rem;
+  line-height: 1.3;
+}
+
+.split-page-thumb.selected .split-page-num-badge {
+  color: #059669;
+  background: #d1fae5;
 }
