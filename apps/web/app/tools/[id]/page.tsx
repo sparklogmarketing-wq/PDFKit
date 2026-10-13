@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ToolRunner from "../../../components/ToolRunner";
+import SplitTool from "../../../components/SplitTool";
 import { manifests } from "../../../lib/registry";
 
 export const dynamicParams = false;
@@ -51,13 +52,21 @@ export default async function ToolPage({ params }: { params: Promise<{ id: strin
   const manifest = manifests.find((m) => m.id === id);
   if (!manifest) notFound();
 
-  const otherTools = manifests.filter((m) => m.id !== id);
+  const categoryLabel = manifest.category;
+  const isActive = (manifest as any).status === "active";
+
+  const relatedTools = manifests
+    .filter((m) => m.id !== id && (m.category === manifest.category || (m as any).status === "active"))
+    .slice(0, 4);
 
   return (
     <div>
+      {/* Header */}
       <div className="tool-page-header">
         <nav className="breadcrumb" aria-label="Breadcrumb">
           <Link href="/">Home</Link>
+          <span className="breadcrumb-separator">/</span>
+          <span>{categoryLabel}</span>
           <span className="breadcrumb-separator">/</span>
           <span style={{ color: "var(--text-main)", fontWeight: 600 }}>{manifest.title}</span>
         </nav>
@@ -66,31 +75,47 @@ export default async function ToolPage({ params }: { params: Promise<{ id: strin
           <div className="tool-title-wrapper">
             <div className="tool-page-icon">{getToolHeaderIcon(manifest.id)}</div>
             <div>
-              <h1 className="tool-page-title">{manifest.title}</h1>
-              <p className="tool-page-desc">{manifest.description}</p>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <h1 className="tool-page-title" style={{ margin: 0 }}>{manifest.title}</h1>
+                <span className={`tool-badge ${isActive ? "active" : "planned"}`}>
+                  {isActive ? "Ready" : "Planned"}
+                </span>
+              </div>
+              <p className="tool-page-desc" style={{ marginTop: "0.25rem" }}>{manifest.description}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <ToolRunner manifest={manifest} />
+      {/* Tool body — custom UI for split, generic runner for everything else */}
+      {id === "split" ? (
+        <SplitTool />
+      ) : (
+        <ToolRunner manifest={manifest} />
+      )}
 
-      {otherTools.length > 0 && (
+      {/* Related tools */}
+      {relatedTools.length > 0 && (
         <div style={{ marginTop: "4rem", paddingTop: "2rem", borderTop: "1px solid var(--border-light)" }}>
           <h2 style={{ fontSize: "1.125rem", fontWeight: 700, marginBottom: "1rem" }}>
-            Other Tools
+            Related Tools
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(16rem, 1fr))", gap: "1rem" }}>
-            {otherTools.map((t) => (
+            {relatedTools.map((t) => (
               <Link
                 key={t.id}
                 href={`/tools/${t.id}`}
                 className="tool-card"
                 style={{ padding: "1rem" }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.35rem" }}>
-                  <div style={{ color: "var(--primary)" }}>{getToolHeaderIcon(t.id)}</div>
-                  <strong style={{ fontSize: "0.9375rem" }}>{t.title}</strong>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <div style={{ color: "var(--primary)" }}>{getToolHeaderIcon(t.id)}</div>
+                    <strong style={{ fontSize: "0.9375rem" }}>{t.title}</strong>
+                  </div>
+                  <span className={`tool-badge ${ (t as any).status === "active" ? "active" : "planned"}`}>
+                    {(t as any).status === "active" ? "Ready" : "Planned"}
+                  </span>
                 </div>
                 <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
                   {t.description}

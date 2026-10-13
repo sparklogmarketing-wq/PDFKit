@@ -8,5 +8,6 @@ export const manifest: ToolManifest = {
       options: [{ value: "ranges", label: "Page ranges" }, { value: "every", label: "Every N pages" }] },
     { key: "ranges", label: "Ranges (one file per comma group)", type: "text", default: "1-3,4-", placeholder: "1-3,4-" },
     { key: "n", label: "N (for every N pages)", type: "number", default: 1, min: 1 },
+    { key: "mergeAll", label: "Merge all ranges in one PDF", type: "checkbox", default: false },
   ],
 };

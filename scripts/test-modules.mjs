@@ -109,6 +109,17 @@ test("mod-split", async (t) => {
     const doc3 = await PDFDocument.load(results[2].data);
     assert.equal(doc3.getPageCount(), 1);
   });
+
+  await t.test("merges all ranges into one PDF when mergeAll is true", async () => {
+    const results = await splitMod.run([
+      { name: "sample.pdf", data: pdf },
+    ], { mode: "ranges", ranges: "1-2, 4-5", n: 1, mergeAll: true }, ctx);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "sample-merged.pdf");
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 4);
+  });
 });
 
 test("mod-rotate", async (t) => {
