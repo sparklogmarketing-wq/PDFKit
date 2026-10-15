@@ -23,11 +23,12 @@ const mod: ToolModule<OrganizeOpts> = {
     }
 
     // Pre-load all source documents
-    const srcDocs: PDFDocument[] = [];
-    for (let f = 0; f < files.length; f++) {
-      checkAborted(ctx.signal);
-      srcDocs.push(await PDFDocument.load(files[f].data));
-    }
+    const srcDocs = await Promise.all(
+      files.map((file) => {
+        checkAborted(ctx.signal);
+        return PDFDocument.load(file.data);
+      })
+    );
 
     let items: OrganizePageItem[] = [];
     if (Array.isArray(opts.pages)) {
@@ -52,7 +53,40 @@ const mod: ToolModule<OrganizeOpts> = {
       throw new ToolError("No pages remaining to organize. At least one page must be kept.");
     }
 
+    // Validate page requests upfront
+    for (const item of items) {
+      if (!item.isBlank) {
+        const fileIdx = Number(item.fileIndex) || 0;
+        const pageIdx = Number(item.pageIndex) || 0;
+        if (fileIdx < 0 || fileIdx >= srcDocs.length) {
+          throw new ToolError(`Invalid file index ${fileIdx}.`);
+        }
+        const src = srcDocs[fileIdx];
+        if (pageIdx < 0 || pageIdx >= src.getPageCount()) {
+          throw new ToolError(`Invalid page index ${pageIdx} for file ${files[fileIdx].name}.`);
+        }
+      }
+    }
+
     const outDoc = await PDFDocument.create();
+
+    // Group page copies per source doc to avoid awaiting in a loop
+    const docRequestedPages: number[][] = srcDocs.map(() => []);
+    for (const item of items) {
+      if (!item.isBlank) {
+        docRequestedPages[Number(item.fileIndex) || 0].push(Number(item.pageIndex) || 0);
+      }
+    }
+
+    const copiedPagesPerDoc = await Promise.all(
+      srcDocs.map((src, fIdx) =>
+        docRequestedPages[fIdx].length > 0
+          ? outDoc.copyPages(src, docRequestedPages[fIdx])
+          : Promise.resolve([])
+      )
+    );
+
+    const pageCursors = new Array(srcDocs.length).fill(0);
     const totalItems = items.length;
 
     for (let i = 0; i < totalItems; i++) {
@@ -64,17 +98,7 @@ const mod: ToolModule<OrganizeOpts> = {
         outDoc.addPage([595.28, 841.89]);
       } else {
         const fileIdx = Number(item.fileIndex) || 0;
-        const pageIdx = Number(item.pageIndex) || 0;
-
-        if (fileIdx < 0 || fileIdx >= srcDocs.length) {
-          throw new ToolError(`Invalid file index ${fileIdx}.`);
-        }
-        const src = srcDocs[fileIdx];
-        if (pageIdx < 0 || pageIdx >= src.getPageCount()) {
-          throw new ToolError(`Invalid page index ${pageIdx} for file ${files[fileIdx].name}.`);
-        }
-
-        const [copied] = await outDoc.copyPages(src, [pageIdx]);
+        const copied = copiedPagesPerDoc[fileIdx][pageCursors[fileIdx]++];
         if (item.rotation) {
           const curAngle = copied.getRotation().angle;
           copied.setRotation(degrees((curAngle + Number(item.rotation)) % 360));

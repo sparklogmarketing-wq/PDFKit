@@ -43,6 +43,26 @@ export interface PageItem {
   isBlank?: boolean;
 }
 
+interface OrganizePageCardProps {
+  readonly item: PageItem;
+  readonly seqNumber: number;
+  readonly theme?: ColorTheme;
+  readonly file?: File;
+  readonly isDragging: boolean;
+  readonly isDropTarget: boolean;
+  readonly onRotate: () => void;
+  readonly onDelete: () => void;
+  readonly onZoom: () => void;
+  readonly onDragStart: (e: React.DragEvent) => void;
+  readonly onDragOver: (e: React.DragEvent) => void;
+  readonly onDragEnter: (e: React.DragEvent) => void;
+  readonly onDragLeave: (e: React.DragEvent) => void;
+  readonly onDrop: (e: React.DragEvent) => void;
+  readonly onDragEnd: (e: React.DragEvent) => void;
+  readonly onInsertBlank: () => void;
+  readonly onInsertPdfClick: () => void;
+}
+
 /* ── Page Card Component ─────────────────────────────────── */
 function OrganizePageCard({
   item,
@@ -62,25 +82,7 @@ function OrganizePageCard({
   onDragEnd,
   onInsertBlank,
   onInsertPdfClick,
-}: {
-  item: PageItem;
-  seqNumber: number;
-  theme?: ColorTheme;
-  file?: File;
-  isDragging: boolean;
-  isDropTarget: boolean;
-  onRotate: () => void;
-  onDelete: () => void;
-  onZoom: () => void;
-  onDragStart: (e: React.DragEvent) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDragEnter: (e: React.DragEvent) => void;
-  onDragLeave: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
-  onDragEnd: (e: React.DragEvent) => void;
-  onInsertBlank: () => void;
-  onInsertPdfClick: () => void;
-}) {
+}: OrganizePageCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -93,9 +95,13 @@ function OrganizePageCard({
     let active = true;
     setLoading(true);
     if (canvasRef.current) {
-      renderPdfPage(file, canvasRef.current, item.pageIndex + 1, 180).then(() => {
-        if (active) setLoading(false);
-      });
+      void renderPdfPage(file, canvasRef.current, item.pageIndex + 1, 180)
+        .then(() => {
+          if (active) setLoading(false);
+        })
+        .catch(() => {
+          if (active) setLoading(false);
+        });
     }
     return () => {
       active = false;
@@ -126,7 +132,7 @@ function OrganizePageCard({
             setMenuOpen((prev) => !prev);
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <line x1="12" y1="11" x2="12" y2="17" />
             <line x1="9" y1="14" x2="15" y2="14" />
@@ -178,7 +184,7 @@ function OrganizePageCard({
                 onZoom();
               }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 <line x1="11" y1="8" x2="11" y2="14" />
@@ -196,7 +202,7 @@ function OrganizePageCard({
               onRotate();
             }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21.5 2v6h-6" />
               <path d="M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
             </svg>
@@ -211,7 +217,7 @@ function OrganizePageCard({
               onDelete();
             }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -227,8 +233,17 @@ function OrganizePageCard({
               onZoom();
             }
           }}
+          onKeyDown={(e) => {
+            if (!item.isBlank && (e.key === "Enter" || e.key === " ")) {
+              e.stopPropagation();
+              onZoom();
+            }
+          }}
+          role={item.isBlank ? undefined : "button"}
+          tabIndex={item.isBlank ? undefined : 0}
           style={{ cursor: item.isBlank ? "default" : "pointer" }}
           title={item.isBlank ? "" : "Click to preview page"}
+          aria-label={item.isBlank ? undefined : `Preview page ${seqNumber}`}
         >
           {item.isBlank ? (
             <div className="organize-blank-sheet">
@@ -260,6 +275,12 @@ function OrganizePageCard({
       </div>
     </div>
   );
+}
+
+function formatBytes(b: number) {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1024 / 1024).toFixed(2)} MB`;
 }
 
 /* ── Main Organize Tool Component ─────────────────────────── */
@@ -317,14 +338,15 @@ export default function OrganizeTool() {
 
       const newEntries: FileEntry[] = [];
       const newPagesList: PageItem[] = [];
+      const fileInfos = await Promise.all(arr.map((file) => getPdfInfo(file)));
 
       for (let i = 0; i < arr.length; i++) {
         const file = arr[i];
-        const letter = String.fromCharCode(65 + ((files.length + i) % 26));
+        const letter = String.fromCodePoint(65 + ((files.length + i) % 26));
         const theme = FILE_PALETTES[(files.length + i) % FILE_PALETTES.length];
-        const info = await getPdfInfo(file);
+        const info = fileInfos[i];
         const total = info?.numPages || 1;
-        const fileId = `f-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const fileId = `f-${crypto.randomUUID()}`;
 
         const entry: FileEntry = {
           id: fileId,
@@ -338,7 +360,7 @@ export default function OrganizeTool() {
         const currentFileIndex = files.length + i;
         for (let p = 0; p < total; p++) {
           newPagesList.push({
-            id: `p-${fileId}-${p}-${Math.random().toString(36).slice(2, 6)}`,
+            id: `p-${fileId}-${p}-${crypto.randomUUID()}`,
             fileId,
             fileIndex: currentFileIndex,
             pageIndex: p,
@@ -366,7 +388,7 @@ export default function OrganizeTool() {
     e.stopPropagation();
     setIsDraggingFile(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      loadFiles(e.dataTransfer.files);
+      void loadFiles(e.dataTransfer.files);
     }
   }
 
@@ -393,7 +415,7 @@ export default function OrganizeTool() {
 
   function handleInsertBlank(insertAt: number) {
     const blankItem: PageItem = {
-      id: `blank-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: `blank-${crypto.randomUUID()}`,
       fileId: "blank",
       fileIndex: -1,
       pageIndex: -1,
@@ -476,7 +498,7 @@ export default function OrganizeTool() {
     // Re-assign letters & themes according to new positions
     const reLettered = sortedFiles.map((entry, idx) => ({
       ...entry,
-      letter: String.fromCharCode(65 + (idx % 26)),
+      letter: String.fromCodePoint(65 + (idx % 26)),
       theme: FILE_PALETTES[idx % FILE_PALETTES.length],
     }));
 
@@ -581,7 +603,7 @@ export default function OrganizeTool() {
     // Re-assign letters
     const reLettered = updatedFiles.map((entry, idx) => ({
       ...entry,
-      letter: String.fromCharCode(65 + (idx % 26)),
+      letter: String.fromCodePoint(65 + (idx % 26)),
       theme: FILE_PALETTES[idx % FILE_PALETTES.length],
     }));
 
@@ -600,7 +622,7 @@ export default function OrganizeTool() {
     // Re-assign letters & themes according to new positions
     const reLettered = updatedFiles.map((entry, idx) => ({
       ...entry,
-      letter: String.fromCharCode(65 + (idx % 26)),
+      letter: String.fromCodePoint(65 + (idx % 26)),
       theme: FILE_PALETTES[idx % FILE_PALETTES.length],
     }));
 
@@ -679,12 +701,6 @@ export default function OrganizeTool() {
     setSortNumDir("1-9");
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (appendFileInputRef.current) appendFileInputRef.current.value = "";
-  }
-
-  function formatBytes(b: number) {
-    if (b < 1024) return `${b} B`;
-    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-    return `${(b / 1024 / 1024).toFixed(2)} MB`;
   }
 
   /* ── Run Organize ───────────────────────────────────────── */
@@ -783,7 +799,8 @@ export default function OrganizeTool() {
       <div className="tool-runner-panel">
         <div className="dropzone-container">
           {renderHiddenInputs()}
-          <div
+          <button
+            type="button"
             className={`dropzone ${isDraggingFile ? "active" : ""}`}
             onDragOver={(e) => {
               e.preventDefault();
@@ -797,8 +814,10 @@ export default function OrganizeTool() {
             }}
             onDrop={handleInitialDrop}
             onClick={() => fileInputRef.current?.click()}
+            style={{ width: "100%", fontFamily: "inherit", cursor: "pointer" }}
           >
             <svg
+              aria-hidden="true"
               className="dropzone-icon"
               viewBox="0 0 24 24"
               fill="none"
@@ -818,11 +837,11 @@ export default function OrganizeTool() {
             <span className="dropzone-badge">
               Multiple files (.pdf)
             </span>
-          </div>
+          </button>
 
           {error && (
             <div className="alert-error" style={{ marginTop: "1rem" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="8" x2="12" y2="12" />
                 <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -851,7 +870,7 @@ export default function OrganizeTool() {
             marginBottom: "1rem",
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5">
             <polyline points="20 6 9 17 4 12" />
           </svg>
           <strong style={{ color: "#065f46" }}>
@@ -860,9 +879,9 @@ export default function OrganizeTool() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
-          {results.map((r, i) => (
+          {results.map((r) => (
             <div
-              key={i}
+              key={r.name}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -875,7 +894,7 @@ export default function OrganizeTool() {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
                 </svg>
@@ -907,6 +926,13 @@ export default function OrganizeTool() {
         </div>
       </div>
     );
+  }
+
+  let sortAlphaTitle = "Add multiple files to sort alphabetically";
+  if (files.length > 1) {
+    sortAlphaTitle = sortAlphaDir === "A-Z"
+      ? "Sort files A to Z (Alphabetical)"
+      : "Sort files Z to A (Reverse Alphabetical)";
   }
 
   /* ── 3. Render Main Workspace (Grid + Sidebar) ───────────── */
@@ -981,7 +1007,7 @@ export default function OrganizeTool() {
                 }}
               >
                 <span className="organize-tool-badge">{files.length}</span>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
@@ -993,20 +1019,14 @@ export default function OrganizeTool() {
               <button
                 type="button"
                 className="organize-tool-btn"
-                title={
-                  files.length <= 1
-                    ? "Add multiple files to sort alphabetically"
-                    : sortAlphaDir === "A-Z"
-                    ? "Sort files A to Z (Alphabetical)"
-                    : "Sort files Z to A (Reverse Alphabetical)"
-                }
+                title={sortAlphaTitle}
                 disabled={files.length <= 1}
                 onClick={handleSortAlphabetical}
               >
                 {sortAlphaDir === "A-Z" ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <span style={{ fontSize: "0.72rem", fontWeight: 800 }}>A</span>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <polyline points="7 10 12 15 17 10" />
                     </svg>
                     <span style={{ fontSize: "0.72rem", fontWeight: 800 }}>Z</span>
@@ -1014,7 +1034,7 @@ export default function OrganizeTool() {
                 ) : (
                   <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <span style={{ fontSize: "0.72rem", fontWeight: 800 }}>Z</span>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <polyline points="7 10 12 15 17 10" />
                     </svg>
                     <span style={{ fontSize: "0.72rem", fontWeight: 800 }}>A</span>
@@ -1036,7 +1056,7 @@ export default function OrganizeTool() {
                 {sortNumDir === "1-9" ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <span style={{ fontSize: "0.75rem", fontWeight: 800 }}>1</span>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <line x1="12" y1="5" x2="12" y2="19" />
                       <polyline points="19 12 12 19 5 12" />
                     </svg>
@@ -1045,7 +1065,7 @@ export default function OrganizeTool() {
                 ) : (
                   <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <span style={{ fontSize: "0.75rem", fontWeight: 800 }}>9</span>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <line x1="12" y1="5" x2="12" y2="19" />
                       <polyline points="19 12 12 19 5 12" />
                     </svg>
@@ -1123,7 +1143,7 @@ export default function OrganizeTool() {
                       className="organize-chip-handle"
                       title="Drag to reorder"
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="7 15 12 20 17 15" />
                         <polyline points="7 9 12 4 17 9" />
                       </svg>
@@ -1167,7 +1187,7 @@ export default function OrganizeTool() {
           {/* Errors */}
           {error && (
             <div className="alert-error">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="8" x2="12" y2="12" />
                 <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -1217,7 +1237,7 @@ export default function OrganizeTool() {
                 disabled={files.length === 0 || pages.length === 0}
               >
                 Organize
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 8 16 12 12 16" />
                   <line x1="8" y1="12" x2="16" y2="12" />

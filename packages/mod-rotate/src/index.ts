@@ -103,8 +103,8 @@ async function processPdfFile(
     ? parseDegrees(fileOverrides.degrees, defaultDelta)
     : defaultDelta;
 
-  const filePagesSpec = fileOverrides?.pages !== undefined ? fileOverrides.pages : opts.pages;
-  const fileExcludeSpec = fileOverrides?.excludePages !== undefined ? fileOverrides.excludePages : opts.excludePages;
+  const filePagesSpec = fileOverrides?.pages ?? opts.pages;
+  const fileExcludeSpec = fileOverrides?.excludePages ?? opts.excludePages;
   const fileCustomRules = fileOverrides?.customRotations ?? opts.customRotations ?? [];
   const filePageRotations = fileOverrides?.pageRotations ?? opts.pageRotations ?? {};
 
@@ -152,12 +152,11 @@ const mod: ToolModule<RotateOptions> = {
     }
 
     const defaultDelta = parseDegrees(opts.degrees ?? opts.direction, 90);
-    const results: OutputFile[] = [];
-
-    for (let fIdx = 0; fIdx < inputs.length; fIdx++) {
-      const result = await processPdfFile(inputs[fIdx], fIdx, inputs.length, opts, defaultDelta, ctx);
-      results.push(result);
-    }
+    const results = await Promise.all(
+      inputs.map((file, fIdx) =>
+        processPdfFile(file, fIdx, inputs.length, opts, defaultDelta, ctx)
+      )
+    );
 
     checkAborted(ctx.signal);
     return results;

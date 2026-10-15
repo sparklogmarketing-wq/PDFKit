@@ -6,7 +6,6 @@ import { renderPdfPage } from "../lib/pdfjs";
 interface PdfZoomModalProps {
   readonly file: File | null;
   readonly pageNum?: number;
-  readonly displayPageNum?: number;
   readonly angle?: number;
   readonly rotation?: number;
   readonly isProtected?: boolean;
@@ -68,20 +67,30 @@ export default function PdfZoomModal({
   return (
     <div
       className="pdf-modal-backdrop"
-      onClick={onClose}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") onClose();
-      }}
-      role="button"
-      tabIndex={0}
+      role="dialog"
       aria-modal="true"
       aria-label="Page Preview"
     >
+      <button
+        type="button"
+        aria-label="Close preview background"
+        tabIndex={-1}
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          margin: 0,
+          cursor: "default",
+        }}
+      />
       <div
         className="pdf-zoom-clean-wrapper"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-        role="dialog"
+        style={{ position: "relative", zIndex: 1 }}
       >
         {/* Floating Close Button */}
         <button
