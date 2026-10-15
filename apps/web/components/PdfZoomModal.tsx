@@ -4,14 +4,14 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { renderPdfPage } from "../lib/pdfjs";
 
 interface PdfZoomModalProps {
-  file: File | null;
-  pageNum?: number;
-  displayPageNum?: number;
-  angle?: number;
-  isProtected?: boolean;
-  onRotateLeft?: () => void;
-  onRotateRight?: () => void;
-  onClose: () => void;
+  readonly file: File | null;
+  readonly pageNum?: number;
+  readonly displayPageNum?: number;
+  readonly angle?: number;
+  readonly isProtected?: boolean;
+  readonly onRotateLeft?: () => void;
+  readonly onRotateRight?: () => void;
+  readonly onClose: () => void;
 }
 
 export default function PdfZoomModal({
@@ -31,7 +31,6 @@ export default function PdfZoomModal({
     if (!file || !canvasRef.current) return;
     setLoading(true);
     try {
-      // Render page at high resolution
       await renderPdfPage(file, canvasRef.current, pageNum, 1100);
     } finally {
       setLoading(false);
@@ -39,7 +38,7 @@ export default function PdfZoomModal({
   }, [file, pageNum]);
 
   useEffect(() => {
-    renderPage();
+    void renderPage();
   }, [renderPage]);
 
   // Keyboard navigation: Escape to close, Left/Right arrows to rotate
@@ -62,7 +61,6 @@ export default function PdfZoomModal({
   const effectiveAngle = isProtected ? 0 : angle;
   const normAngle = ((effectiveAngle % 360) + 360) % 360;
   const isSideways = normAngle % 180 !== 0;
-  // Scale down slightly when rotated 90/270 sideways so it fits within the viewport completely
   const scaleRatio = isSideways ? 0.72 : 1;
   const displayNum = displayPageNum ?? pageNum;
 
@@ -70,13 +68,17 @@ export default function PdfZoomModal({
     <div
       className="pdf-modal-backdrop"
       onClick={onClose}
-      role="dialog"
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClose(); }}
+      role="button"
+      tabIndex={0}
       aria-modal="true"
       aria-label={`Preview of ${file.name} - Page ${displayNum}`}
     >
       <div
         className="pdf-modal-container"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        role="dialog"
         style={{
           width: "92vw",
           maxWidth: "960px",
@@ -86,11 +88,12 @@ export default function PdfZoomModal({
           overflow: "hidden",
         }}
       >
-        {/* Modal Header: File info, page badge, rotation controls, and close */}
+        {/* Modal Header */}
         <div className="pdf-modal-header" style={{ flexShrink: 0, padding: "0.75rem 1.25rem" }}>
           <div className="pdf-modal-fileinfo" style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0 }}>
             <svg
               className="pdf-modal-icon"
+              aria-hidden="true"
               width="20"
               height="20"
               viewBox="0 0 24 24"
@@ -123,13 +126,13 @@ export default function PdfZoomModal({
           </div>
 
           <div className="pdf-modal-actions" style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
-            {/* Left and Right Rotation Controls inside the Zoom Preview */}
             {onRotateLeft && onRotateRight && !isProtected && (
               <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
                 <button
                   type="button"
                   onClick={onRotateLeft}
                   title="Rotate Left (90° CCW)"
+                  aria-label="Rotate page left 90 degrees"
                   style={{
                     padding: "0.35rem 0.65rem",
                     fontSize: "0.8125rem",
@@ -145,7 +148,7 @@ export default function PdfZoomModal({
                     transition: "all 0.15s ease",
                   }}
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="1 4 1 10 7 10" />
                     <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
                   </svg>
@@ -156,6 +159,7 @@ export default function PdfZoomModal({
                   type="button"
                   onClick={onRotateRight}
                   title="Rotate Right (90° CW)"
+                  aria-label="Rotate page right 90 degrees"
                   style={{
                     padding: "0.35rem 0.65rem",
                     fontSize: "0.8125rem",
@@ -171,7 +175,7 @@ export default function PdfZoomModal({
                     transition: "all 0.15s ease",
                   }}
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="23 4 23 10 17 10" />
                     <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                   </svg>
@@ -205,7 +209,7 @@ export default function PdfZoomModal({
           </div>
         </div>
 
-        {/* Modal Body: Clean, no scrollers, responsive */}
+        {/* Modal Body */}
         <div
           className="pdf-modal-body"
           style={{
