@@ -5,6 +5,7 @@ import { parsePageSpec, ToolError } from "../packages/core/src/index.ts";
 import mergeMod from "../packages/mod-merge/src/index.ts";
 import splitMod from "../packages/mod-split/src/index.ts";
 import rotateMod from "../packages/mod-rotate/src/index.ts";
+import organizeMod from "../packages/mod-organize/src/index.ts";
 
 async function createSamplePdf(pages = 3) {
   const doc = await PDFDocument.create();
@@ -162,3 +163,40 @@ test("mod-rotate", async (t) => {
     assert.equal(doc.getPage(2).getRotation().angle, 180);
   });
 });
+
+test("mod-organize", async (t) => {
+  const pdfA = await createSamplePdf(3); // 3 pages (0, 1, 2)
+  const pdfB = await createSamplePdf(2); // 2 pages (0, 1)
+  const ctx = { signal: new AbortController().signal, onProgress: () => {} };
+
+  await t.test("sorts, rotates, deletes, and adds blank pages across PDFs", async () => {
+    // Pick Page 2 from A, Page 1 from B rotated 90, a blank page, Page 0 from A
+    const pages = [
+      { fileIndex: 0, pageIndex: 2, rotation: 0 },
+      { fileIndex: 1, pageIndex: 0, rotation: 90 },
+      { isBlank: true },
+      { fileIndex: 0, pageIndex: 0, rotation: 0 },
+    ];
+
+    const results = await organizeMod.run([
+      { name: "docA.pdf", data: pdfA },
+      { name: "docB.pdf", data: pdfB },
+    ], { pages }, ctx);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "docA_organized.pdf");
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 4);
+    assert.equal(doc.getPage(0).getRotation().angle, 0);
+    assert.equal(doc.getPage(1).getRotation().angle, 90);
+  });
+
+  await t.test("throws error when no pages remain", async () => {
+    await assert.rejects(async () => {
+      await organizeMod.run([
+        { name: "docA.pdf", data: pdfA },
+      ], { pages: [] }, ctx);
+    }, /No pages remaining/);
+  });
+});
+

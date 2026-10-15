@@ -1,1 +1,27 @@
-{"name":"web","private":true,"version":"0.1.0","scripts":{"dev":"next dev","build":"next build","typecheck":"tsc --noEmit"},"dependencies":{"@pdfkit/core":"*","@pdfkit/mod-merge":"*","@pdfkit/mod-rotate":"*","@pdfkit/mod-split":"*","jszip":"^3.10.2","next":"^15.0.0","react":"^19.0.0","react-dom":"^19.0.0"},"devDependencies":{"@types/jszip":"^3.4.0","@types/node":"^22.0.0","@types/react":"^19.0.0","@types/react-dom":"^19.0.0"}}
+{
+  "name": "web",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pdfkit/core": "*",
+    "@pdfkit/mod-merge": "*",
+    "@pdfkit/mod-organize": "*",
+    "@pdfkit/mod-rotate": "*",
+    "@pdfkit/mod-split": "*",
+    "jszip": "^3.10.2",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/jszip": "^3.4.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}

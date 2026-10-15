@@ -6,10 +6,16 @@ import { renderPdfPage } from "../lib/pdfjs";
 interface PdfZoomModalProps {
   file: File | null;
   pageNum?: number;
+  rotation?: number;
   onClose: () => void;
 }
 
-export default function PdfZoomModal({ file, pageNum = 1, onClose }: PdfZoomModalProps) {
+export default function PdfZoomModal({
+  file,
+  pageNum = 1,
+  rotation = 0,
+  onClose,
+}: PdfZoomModalProps) {
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -18,7 +24,7 @@ export default function PdfZoomModal({ file, pageNum = 1, onClose }: PdfZoomModa
     setLoading(true);
     try {
       // Render page at high resolution
-      await renderPdfPage(file, canvasRef.current, pageNum, 1000);
+      await renderPdfPage(file, canvasRef.current, pageNum, 1200);
     } finally {
       setLoading(false);
     }
@@ -47,56 +53,52 @@ export default function PdfZoomModal({ file, pageNum = 1, onClose }: PdfZoomModa
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={`Preview of ${file.name}`}
+      aria-label="Page Preview"
     >
-      <div className="pdf-modal-container" onClick={(e) => e.stopPropagation()}>
-        {/* Modal Header: File info & Close button only */}
-        <div className="pdf-modal-header">
-          <div className="pdf-modal-fileinfo">
-            <svg
-              className="pdf-modal-icon"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-            <span className="pdf-modal-filename" title={file.name}>
-              {file.name}
-            </span>
-          </div>
+      <div
+        className="pdf-zoom-clean-wrapper"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Floating Close Button */}
+        <button
+          type="button"
+          className="pdf-zoom-close-btn"
+          onClick={onClose}
+          title="Close preview (Esc)"
+          aria-label="Close"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
 
-          <div className="pdf-modal-actions">
-            <button
-              type="button"
-              className="modal-close-btn"
-              onClick={onClose}
-              title="Close preview (Esc)"
-              aria-label="Close"
-            >
-              &times;
-            </button>
+        {/* Loading Spinner */}
+        {loading && (
+          <div className="pdf-modal-loading">
+            <div className="spinner" />
+            <span>Loading preview...</span>
           </div>
-        </div>
+        )}
 
-        {/* Modal Body: Full First Page at a glance without scrolling */}
-        <div className="pdf-modal-body">
-          {loading && (
-            <div className="pdf-modal-loading">
-              <div className="spinner" />
-              <span>Rendering preview...</span>
-            </div>
-          )}
-          <div className="pdf-modal-canvas-wrapper">
-            <canvas ref={canvasRef} className="pdf-modal-canvas" />
-          </div>
-        </div>
+        {/* Pure Page Canvas */}
+        <canvas
+          ref={canvasRef}
+          className="pdf-zoom-page-canvas"
+          style={{
+            transform: rotation ? `rotate(${rotation}deg)` : undefined,
+            transition: "transform 0.2s ease",
+          }}
+        />
       </div>
     </div>
   );
