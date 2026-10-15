@@ -1,9 +1,9 @@
-import JSZip from "jszip";
-
 export async function downloadFilesAsZip(
   files: { name: string; url: string }[],
   zipFilename: string
 ) {
+  const JSZipModule = await import("jszip");
+  const JSZip = JSZipModule.default || JSZipModule;
   const zip = new JSZip();
 
   // Fetch each file blob and add to ZIP

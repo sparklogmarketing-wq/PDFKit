@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ToolRunner from "../../../components/ToolRunner";
 import SplitTool from "../../../components/SplitTool";
+import RotateTool from "../../../components/RotateTool";
 import { manifests } from "../../../lib/registry";
 
 export const dynamicParams = false;
@@ -87,12 +88,15 @@ export default async function ToolPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      {/* Tool body — custom UI for split, generic runner for everything else */}
+      {/* Tool body — custom UI for split and rotate, generic runner for everything else */}
       {id === "split" ? (
         <SplitTool />
+      ) : id === "rotate" ? (
+        <RotateTool />
       ) : (
         <ToolRunner manifest={manifest} />
       )}
+
 
       {/* Related tools */}
       {relatedTools.length > 0 && (
