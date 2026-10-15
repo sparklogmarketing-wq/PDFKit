@@ -4,12 +4,26 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { renderPdfPage } from "../lib/pdfjs";
 
 interface PdfZoomModalProps {
-  file: File | null;
-  pageNum?: number;
-  onClose: () => void;
+  readonly file: File | null;
+  readonly pageNum?: number;
+  readonly angle?: number;
+  readonly rotation?: number;
+  readonly isProtected?: boolean;
+  readonly onRotateLeft?: () => void;
+  readonly onRotateRight?: () => void;
+  readonly onClose: () => void;
 }
 
-export default function PdfZoomModal({ file, pageNum = 1, onClose }: PdfZoomModalProps) {
+export default function PdfZoomModal({
+  file,
+  pageNum = 1,
+  angle = 0,
+  rotation = 0,
+  isProtected = false,
+  onRotateLeft,
+  onRotateRight,
+  onClose,
+}: PdfZoomModalProps) {
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -18,85 +32,187 @@ export default function PdfZoomModal({ file, pageNum = 1, onClose }: PdfZoomModa
     setLoading(true);
     try {
       // Render page at high resolution
-      await renderPdfPage(file, canvasRef.current, pageNum, 1000);
+      await renderPdfPage(file, canvasRef.current, pageNum, 1200);
     } finally {
       setLoading(false);
     }
   }, [file, pageNum]);
 
   useEffect(() => {
-    renderPage();
+    void renderPage();
   }, [renderPage]);
 
-  // Close on Escape key
+  // Keyboard navigation: Escape to close, Left/Right arrows to rotate
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         onClose();
+      } else if (e.key === "ArrowLeft" && onRotateLeft && !isProtected) {
+        onRotateLeft();
+      } else if (e.key === "ArrowRight" && onRotateRight && !isProtected) {
+        onRotateRight();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, onRotateLeft, onRotateRight, isProtected]);
 
   if (!file) return null;
+
+  const effectiveAngle = isProtected ? 0 : (angle || rotation || 0);
+  const normAngle = ((effectiveAngle % 360) + 360) % 360;
+  const isSideways = normAngle % 180 !== 0;
+  const scaleRatio = isSideways ? 0.72 : 1;
 
   return (
     <div
       className="pdf-modal-backdrop"
-      onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={`Preview of ${file.name}`}
+      aria-label="Page Preview"
     >
-      <div className="pdf-modal-container" onClick={(e) => e.stopPropagation()}>
-        {/* Modal Header: File info & Close button only */}
-        <div className="pdf-modal-header">
-          <div className="pdf-modal-fileinfo">
-            <svg
-              className="pdf-modal-icon"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-            <span className="pdf-modal-filename" title={file.name}>
-              {file.name}
-            </span>
-          </div>
+      <button
+        type="button"
+        aria-label="Close preview background"
+        tabIndex={-1}
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          margin: 0,
+          cursor: "default",
+        }}
+      />
+      <div
+        className="pdf-zoom-clean-wrapper"
+        style={{ position: "relative", zIndex: 1 }}
+      >
+        {/* Floating Close Button */}
+        <button
+          type="button"
+          className="pdf-zoom-close-btn"
+          onClick={onClose}
+          title="Close preview (Esc)"
+          aria-label="Close"
+        >
+          <svg
+            aria-hidden="true"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
 
-          <div className="pdf-modal-actions">
+        {/* Floating Rotate controls if opened from rotate tool */}
+        {onRotateLeft && onRotateRight && !isProtected && (
+          <div
+            style={{
+              position: "absolute",
+              top: "-52px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              background: "rgba(255, 255, 255, 0.95)",
+              backdropFilter: "blur(6px)",
+              padding: "0.35rem 0.85rem",
+              borderRadius: "9999px",
+              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
+              zIndex: 30,
+            }}
+          >
             <button
               type="button"
-              className="modal-close-btn"
-              onClick={onClose}
-              title="Close preview (Esc)"
-              aria-label="Close"
+              onClick={onRotateLeft}
+              title="Rotate Left (90° CCW)"
+              aria-label="Rotate page left 90 degrees"
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "var(--primary)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.3rem",
+                fontWeight: 700,
+                fontSize: "0.8125rem",
+              }}
             >
-              &times;
+              <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg>
+              <span>Rotate Left</span>
+            </button>
+            <span
+              style={{
+                fontSize: "0.8125rem",
+                fontWeight: 800,
+                color: normAngle !== 0 ? "var(--primary)" : "var(--text-muted)",
+                padding: "0 0.35rem",
+                minWidth: "36px",
+                textAlign: "center",
+              }}
+            >
+              {normAngle}°
+            </span>
+            <button
+              type="button"
+              onClick={onRotateRight}
+              title="Rotate Right (90° CW)"
+              aria-label="Rotate page right 90 degrees"
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "var(--primary)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.3rem",
+                fontWeight: 700,
+                fontSize: "0.8125rem",
+              }}
+            >
+              <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              <span>Rotate Right</span>
             </button>
           </div>
-        </div>
+        )}
 
-        {/* Modal Body: Full First Page at a glance without scrolling */}
-        <div className="pdf-modal-body">
-          {loading && (
-            <div className="pdf-modal-loading">
-              <div className="spinner" />
-              <span>Rendering preview...</span>
-            </div>
-          )}
-          <div className="pdf-modal-canvas-wrapper">
-            <canvas ref={canvasRef} className="pdf-modal-canvas" />
+        {/* Loading Spinner */}
+        {loading && (
+          <div className="pdf-modal-loading">
+            <div className="spinner" />
+            <span>Loading preview...</span>
           </div>
-        </div>
+        )}
+
+        {/* Pure Page Canvas */}
+        <canvas
+          ref={canvasRef}
+          className="pdf-zoom-page-canvas"
+          style={{
+            transform: normAngle ? `rotate(${normAngle}deg) scale(${scaleRatio})` : undefined,
+            transition: "transform 0.24s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+        />
       </div>
     </div>
   );
