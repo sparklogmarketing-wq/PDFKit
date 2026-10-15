@@ -151,16 +151,68 @@ test("mod-rotate", async (t) => {
     assert.equal(doc.getPage(2).getRotation().angle, 0);
   });
 
-  await t.test("rotates all pages when blank", async () => {
+  await t.test("rotates left (counter-clockwise 270 degrees)", async () => {
     const results = await rotateMod.run([
       { name: "doc.pdf", data: pdf },
-    ], { degrees: "180", pages: "" }, ctx);
+    ], { degrees: "left", pages: "1" }, ctx);
 
     assert.equal(results.length, 1);
     const doc = await PDFDocument.load(results[0].data);
-    assert.equal(doc.getPage(0).getRotation().angle, 180);
+    assert.equal(doc.getPage(0).getRotation().angle, 270);
+    assert.equal(doc.getPage(1).getRotation().angle, 0);
+  });
+
+  await t.test("rotates multiple files at a time", async () => {
+    const pdf2 = await createSamplePdf(2);
+    const results = await rotateMod.run([
+      { name: "first.pdf", data: pdf },
+      { name: "second.pdf", data: pdf2 },
+    ], { degrees: "90" }, ctx);
+
+    assert.equal(results.length, 2);
+    assert.equal(results[0].name, "first-rotated.pdf");
+    assert.equal(results[1].name, "second-rotated.pdf");
+
+    const doc1 = await PDFDocument.load(results[0].data);
+    assert.equal(doc1.getPageCount(), 3);
+    assert.equal(doc1.getPage(0).getRotation().angle, 90);
+
+    const doc2 = await PDFDocument.load(results[1].data);
+    assert.equal(doc2.getPageCount(), 2);
+    assert.equal(doc2.getPage(0).getRotation().angle, 90);
+  });
+
+  await t.test("excludes specified pages from rotation", async () => {
+    // 3 pages: rotate 90 right, but exclude page 2
+    const results = await rotateMod.run([
+      { name: "doc.pdf", data: pdf },
+    ], { degrees: "90", pages: "", excludePages: "2" }, ctx);
+
+    assert.equal(results.length, 1);
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPage(0).getRotation().angle, 90);
+    assert.equal(doc.getPage(1).getRotation().angle, 0); // Excluded!
+    assert.equal(doc.getPage(2).getRotation().angle, 90);
+  });
+
+  await t.test("applies custom rotations to specific pages and ranges", async () => {
+    // 3 pages: page 1 -> 90, page 2 -> 180, page 3 -> 270
+    const results = await rotateMod.run([
+      { name: "doc.pdf", data: pdf },
+    ], {
+      degrees: "0",
+      customRotations: [
+        { pages: "1", degrees: "90" },
+        { pages: "2", degrees: "180" },
+        { pages: "3", degrees: "270" },
+      ],
+    }, ctx);
+
+    assert.equal(results.length, 1);
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPage(0).getRotation().angle, 90);
     assert.equal(doc.getPage(1).getRotation().angle, 180);
-    assert.equal(doc.getPage(2).getRotation().angle, 180);
+    assert.equal(doc.getPage(2).getRotation().angle, 270);
   });
 });
 
@@ -199,4 +251,3 @@ test("mod-organize", async (t) => {
     }, /No pages remaining/);
   });
 });
-

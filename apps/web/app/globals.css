@@ -80,6 +80,7 @@ html, body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
 }
 
 a {
@@ -92,6 +93,8 @@ a {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: clip;
 }
 
 .main-content {
@@ -100,6 +103,8 @@ a {
   max-width: 72rem;
   margin: 0 auto;
   padding: 2.5rem 1.5rem 5rem;
+  box-sizing: border-box;
+  overflow-x: clip;
 }
 
 /* ==========================================================================
