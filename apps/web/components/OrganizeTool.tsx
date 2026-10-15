@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
 import { runTool } from "../lib/runTool";
+import { formatBytes } from "../lib/formatBytes";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
 
@@ -277,10 +278,48 @@ function OrganizePageCard({
   );
 }
 
-function formatBytes(b: number) {
-  if (b < 1024) return `${b} B`;
-  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-  return `${(b / 1024 / 1024).toFixed(2)} MB`;
+function handleCardDragLeave(e: React.DragEvent) {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function resequencePagesForFiles(
+  orderedFiles: FileEntry[],
+  currentPages: PageItem[]
+): { reLetteredFiles: FileEntry[]; updatedPages: PageItem[] } {
+  const reLetteredFiles = orderedFiles.map((entry, idx) => ({
+    ...entry,
+    letter: String.fromCodePoint(65 + (idx % 26)),
+    theme: FILE_PALETTES[idx % FILE_PALETTES.length],
+  }));
+
+  const pagesByFile = new Map<string, PageItem[]>();
+  for (const f of reLetteredFiles) {
+    pagesByFile.set(f.id, []);
+  }
+  const blankPages: PageItem[] = [];
+
+  for (const p of currentPages) {
+    if (p.isBlank || !pagesByFile.has(p.fileId)) {
+      blankPages.push(p);
+    } else {
+      pagesByFile.get(p.fileId)!.push(p);
+    }
+  }
+
+  const updatedPages: PageItem[] = [];
+  reLetteredFiles.forEach((fileEntry, newFileIdx) => {
+    const filePages = pagesByFile.get(fileEntry.id) || [];
+    filePages.forEach((p) => {
+      updatedPages.push({
+        ...p,
+        fileIndex: newFileIdx,
+      });
+    });
+  });
+
+  updatedPages.push(...blankPages);
+  return { reLetteredFiles, updatedPages };
 }
 
 /* ── Main Organize Tool Component ─────────────────────────── */
@@ -456,11 +495,6 @@ export default function OrganizeTool() {
     setDragOverPageIndex(index);
   }
 
-  function handleCardDragLeave(e: React.DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
   function handleCardDrop(e: React.DragEvent, dropIndex: number) {
     e.preventDefault();
     e.stopPropagation();
@@ -495,43 +529,8 @@ export default function OrganizeTool() {
       return isAsc ? cmp : -cmp;
     });
 
-    // Re-assign letters & themes according to new positions
-    const reLettered = sortedFiles.map((entry, idx) => ({
-      ...entry,
-      letter: String.fromCodePoint(65 + (idx % 26)),
-      theme: FILE_PALETTES[idx % FILE_PALETTES.length],
-    }));
-
-    // Group existing pages by fileId:
-    const pagesByFile = new Map<string, PageItem[]>();
-    for (const f of reLettered) {
-      pagesByFile.set(f.id, []);
-    }
-    const blankPages: PageItem[] = [];
-
-    for (const p of pages) {
-      if (p.isBlank || !pagesByFile.has(p.fileId)) {
-        blankPages.push(p);
-      } else {
-        pagesByFile.get(p.fileId)!.push(p);
-      }
-    }
-
-    // Sequence pages according to the new file order
-    const updatedPages: PageItem[] = [];
-    reLettered.forEach((fileEntry, newFileIdx) => {
-      const filePages = pagesByFile.get(fileEntry.id) || [];
-      filePages.forEach((p) => {
-        updatedPages.push({
-          ...p,
-          fileIndex: newFileIdx,
-        });
-      });
-    });
-
-    updatedPages.push(...blankPages);
-
-    setFiles(reLettered);
+    const { reLetteredFiles, updatedPages } = resequencePagesForFiles(sortedFiles, pages);
+    setFiles(reLetteredFiles);
     setPages(updatedPages);
     setSortAlphaDir(isAsc ? "Z-A" : "A-Z");
   }
@@ -592,22 +591,11 @@ export default function OrganizeTool() {
     // Remove this file and re-map file indices
     const updatedFiles = files.filter((_, idx) => idx !== fileIdxToRemove);
     // Remove all pages belonging to this file, and update fileIndex of remaining pages
-    const updatedPages = pages
-      .filter((p) => p.fileId !== fileToRemove.id)
-      .map((p) => {
-        if (p.isBlank) return p;
-        const newFileIdx = updatedFiles.findIndex((f) => f.id === p.fileId);
-        return { ...p, fileIndex: newFileIdx };
-      });
+    const remainingPages = pages.filter((p) => p.fileId !== fileToRemove.id);
 
-    // Re-assign letters
-    const reLettered = updatedFiles.map((entry, idx) => ({
-      ...entry,
-      letter: String.fromCodePoint(65 + (idx % 26)),
-      theme: FILE_PALETTES[idx % FILE_PALETTES.length],
-    }));
+    const { reLetteredFiles, updatedPages } = resequencePagesForFiles(updatedFiles, remainingPages);
 
-    setFiles(reLettered);
+    setFiles(reLetteredFiles);
     setPages(updatedPages);
   }
 
@@ -619,44 +607,9 @@ export default function OrganizeTool() {
     const [movedFile] = updatedFiles.splice(fromIndex, 1);
     updatedFiles.splice(toIndex, 0, movedFile);
 
-    // Re-assign letters & themes according to new positions
-    const reLettered = updatedFiles.map((entry, idx) => ({
-      ...entry,
-      letter: String.fromCodePoint(65 + (idx % 26)),
-      theme: FILE_PALETTES[idx % FILE_PALETTES.length],
-    }));
+    const { reLetteredFiles, updatedPages } = resequencePagesForFiles(updatedFiles, pages);
 
-    // Group pages by fileId:
-    const pagesByFile = new Map<string, PageItem[]>();
-    for (const f of reLettered) {
-      pagesByFile.set(f.id, []);
-    }
-    const blankPages: PageItem[] = [];
-
-    for (const p of pages) {
-      if (p.isBlank || !pagesByFile.has(p.fileId)) {
-        blankPages.push(p);
-      } else {
-        pagesByFile.get(p.fileId)!.push(p);
-      }
-    }
-
-    // Sequence pages according to the new file order
-    const updatedPages: PageItem[] = [];
-    reLettered.forEach((fileEntry, newFileIdx) => {
-      const filePages = pagesByFile.get(fileEntry.id) || [];
-      filePages.forEach((p) => {
-        updatedPages.push({
-          ...p,
-          fileIndex: newFileIdx,
-        });
-      });
-    });
-
-    // Keep any blank pages
-    updatedPages.push(...blankPages);
-
-    setFiles(reLettered);
+    setFiles(reLetteredFiles);
     setPages(updatedPages);
   }
 

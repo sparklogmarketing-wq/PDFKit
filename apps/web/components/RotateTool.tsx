@@ -4,17 +4,11 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
 import { runTool } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
+import { formatBytes } from "../lib/formatBytes";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-}
 
 function parseRangePart(trimmed: string, maxPages: number, result: Set<number>) {
   if (trimmed.includes("-")) {
@@ -426,6 +420,23 @@ function RotateResultsView({
 /* ── Right Panel Subcomponents & Tabs ────────────────────────── */
 type RotateTab = "controls" | "range" | "pages";
 
+const rotateDirBtnStyle: React.CSSProperties = {
+  padding: "1rem 0.5rem",
+  borderRadius: "var(--radius-md)",
+  border: "1.5px solid var(--border-medium)",
+  background: "var(--bg-surface)",
+  color: "var(--primary)",
+  fontWeight: 800,
+  fontSize: "0.9375rem",
+  cursor: "pointer",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: "0.35rem",
+  boxShadow: "0 2px 6px rgba(124,58,237,0.08)",
+  transition: "all 0.15s ease",
+};
+
 function RotateControlsTab({
   onRotateGlobalLeft,
   onRotateGlobalRight,
@@ -448,22 +459,7 @@ function RotateControlsTab({
         <button
           type="button"
           onClick={onRotateGlobalLeft}
-          style={{
-            padding: "1rem 0.5rem",
-            borderRadius: "var(--radius-md)",
-            border: "1.5px solid var(--border-medium)",
-            background: "var(--bg-surface)",
-            color: "var(--primary)",
-            fontWeight: 800,
-            fontSize: "0.9375rem",
-            cursor: "pointer",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "0.35rem",
-            boxShadow: "0 2px 6px rgba(124,58,237,0.08)",
-            transition: "all 0.15s ease",
-          }}
+          style={rotateDirBtnStyle}
         >
           <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="1 4 1 10 7 10" />
@@ -476,22 +472,7 @@ function RotateControlsTab({
         <button
           type="button"
           onClick={onRotateGlobalRight}
-          style={{
-            padding: "1rem 0.5rem",
-            borderRadius: "var(--radius-md)",
-            border: "1.5px solid var(--border-medium)",
-            background: "var(--bg-surface)",
-            color: "var(--primary)",
-            fontWeight: 800,
-            fontSize: "0.9375rem",
-            cursor: "pointer",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "0.35rem",
-            boxShadow: "0 2px 6px rgba(124,58,237,0.08)",
-            transition: "all 0.15s ease",
-          }}
+          style={rotateDirBtnStyle}
         >
           <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="23 4 23 10 17 10" />

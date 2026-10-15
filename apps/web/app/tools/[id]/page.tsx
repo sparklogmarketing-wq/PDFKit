@@ -4,58 +4,13 @@ import ToolRunner from "../../../components/ToolRunner";
 import SplitTool from "../../../components/SplitTool";
 import RotateTool from "../../../components/RotateTool";
 import OrganizeTool from "../../../components/OrganizeTool";
+import { ToolIcon } from "../../../components/ToolIcon";
 import { manifests } from "../../../lib/registry";
 
 export const dynamicParams = false;
 
 export function generateStaticParams() {
   return manifests.map((m) => ({ id: m.id }));
-}
-
-function getToolHeaderIcon(id: string) {
-  switch (id) {
-    case "merge":
-      return (
-        <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 7V4h16v3"></path>
-          <path d="M9 20h6"></path>
-          <path d="M12 4v16"></path>
-          <rect x="3" y="10" width="7" height="7" rx="1.5"></rect>
-          <rect x="14" y="10" width="7" height="7" rx="1.5"></rect>
-        </svg>
-      );
-    case "split":
-      return (
-        <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-          <line x1="2" y1="13" x2="22" y2="13" strokeDasharray="2 2"></line>
-        </svg>
-      );
-    case "rotate":
-      return (
-        <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21.5 2v6h-6"></path>
-          <path d="M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
-        </svg>
-      );
-    case "organize":
-      return (
-        <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="7" height="7" rx="1.5" />
-          <rect x="14" y="3" width="7" height="7" rx="1.5" />
-          <rect x="3" y="14" width="7" height="7" rx="1.5" />
-          <path d="M14 17h7m-3-3l3 3-3 3" />
-        </svg>
-      );
-    default:
-      return (
-        <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-        </svg>
-      );
-  }
 }
 
 export default async function ToolPage({ params }: { readonly params: Promise<{ id: string }> }) {
@@ -96,7 +51,9 @@ export default async function ToolPage({ params }: { readonly params: Promise<{ 
 
         <div className="tool-header-content">
           <div className="tool-title-wrapper">
-            <div className="tool-page-icon">{getToolHeaderIcon(manifest.id)}</div>
+            <div className="tool-page-icon">
+              <ToolIcon id={manifest.id} size={26} />
+            </div>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <h1 className="tool-page-title" style={{ margin: 0 }}>{manifest.title}</h1>
@@ -131,7 +88,9 @@ export default async function ToolPage({ params }: { readonly params: Promise<{ 
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <div style={{ color: "var(--primary)" }}>{getToolHeaderIcon(t.id)}</div>
+                      <div style={{ color: "var(--primary)" }}>
+                        <ToolIcon id={t.id} size={24} />
+                      </div>
                       <strong style={{ fontSize: "0.9375rem" }}>{t.title}</strong>
                     </div>
                     <span className={`tool-badge ${tIsActive ? "active" : "planned"}`}>

@@ -1047,7 +1047,7 @@ a {
 
 .pdf-zoom-close-btn:hover {
   background: #fee2e2;
-  color: #dc2626;
+  color: #991b1b;
   border-color: #fca5a5;
   transform: scale(1.12);
 }
@@ -1808,7 +1808,7 @@ a {
   gap: 0.625rem;
   width: 100%;
   padding: 0.9rem 1.5rem;
-  background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, #7e22ce 100%);
   color: #fff;
   border: none;
   border-radius: var(--radius-md);
@@ -1820,7 +1820,7 @@ a {
 }
 
 .split-run-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--primary-dark) 0%, #9333ea 100%);
+  background: linear-gradient(135deg, var(--primary-dark) 0%, #6b21a8 100%);
   box-shadow: 0 6px 18px rgba(124, 58, 237, 0.45);
   transform: translateY(-1px);
 }
@@ -2022,7 +2022,7 @@ a {
 
 .split-page-zoom-btn:hover {
   background: #fee2e2;
-  color: #dc2626;
+  color: #991b1b;
   transform: scale(1.1);
 }
 
@@ -2294,7 +2294,7 @@ a {
 
 .organize-icon-btn.delete:hover {
   background: #fee2e2;
-  color: #dc2626;
+  color: #991b1b;
   transform: scale(1.12);
 }
 
@@ -2389,12 +2389,12 @@ a {
 }
 
 .organize-tool-btn.add {
-  background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, #7e22ce 100%);
   color: #ffffff;
 }
 
 .organize-tool-btn.add:hover {
-  background: linear-gradient(135deg, var(--primary-dark) 0%, #9333ea 100%);
+  background: linear-gradient(135deg, var(--primary-dark) 0%, #6b21a8 100%);
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
 }
