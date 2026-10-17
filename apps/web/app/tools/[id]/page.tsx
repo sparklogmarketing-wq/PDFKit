@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import ToolRunner from "../../../components/ToolRunner";
 import SplitTool from "../../../components/SplitTool";
 import RotateTool from "../../../components/RotateTool";
+import MergeTool from "../../../components/MergeTool";
 import { manifests } from "../../../lib/registry";
 
 export const dynamicParams = false;
@@ -16,11 +17,8 @@ function getToolHeaderIcon(id: string) {
     case "merge":
       return (
         <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 7V4h16v3"></path>
-          <path d="M9 20h6"></path>
-          <path d="M12 4v16"></path>
-          <rect x="3" y="10" width="7" height="7" rx="1.5"></rect>
-          <rect x="14" y="10" width="7" height="7" rx="1.5"></rect>
+          <rect x="8" y="2" width="13" height="15" rx="2"></rect>
+          <path d="M4 8v12a2 2 0 0 0 2 2h12"></path>
         </svg>
       );
     case "split":
@@ -62,7 +60,9 @@ export default async function ToolPage({ params }: { params: Promise<{ id: strin
 
   // Resolve tool component based on id to avoid nested ternary
   let toolComponent: React.ReactNode;
-  if (id === "split") {
+  if (id === "merge") {
+    toolComponent = <MergeTool />;
+  } else if (id === "split") {
     toolComponent = <SplitTool />;
   } else if (id === "rotate") {
     toolComponent = <RotateTool />;

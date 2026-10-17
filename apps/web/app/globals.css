@@ -2031,3 +2031,21 @@ a {
   color: var(--primary);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
+
+/* ── 2-Column Workspace Layouts (Rotate & Merge) ── */
+.merge-workspace-layout,
+.rotate-workspace-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 1.5rem;
+  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .merge-workspace-layout,
+  .rotate-workspace-layout {
+    grid-template-columns: 1fr;
+  }
+}

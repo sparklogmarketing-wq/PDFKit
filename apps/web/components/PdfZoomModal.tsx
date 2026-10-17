@@ -8,6 +8,7 @@ interface PdfZoomModalProps {
   readonly pageNum?: number;
   readonly displayPageNum?: number;
   readonly angle?: number;
+  readonly showAngle?: boolean;
   readonly isProtected?: boolean;
   readonly onRotateLeft?: () => void;
   readonly onRotateRight?: () => void;
@@ -18,7 +19,8 @@ export default function PdfZoomModal({
   file,
   pageNum = 1,
   displayPageNum,
-  angle = 0,
+  angle,
+  showAngle,
   isProtected = false,
   onRotateLeft,
   onRotateRight,
@@ -58,11 +60,13 @@ export default function PdfZoomModal({
 
   if (!file) return null;
 
-  const effectiveAngle = isProtected ? 0 : angle;
+  const rawAngle = angle ?? 0;
+  const effectiveAngle = isProtected ? 0 : rawAngle;
   const normAngle = ((effectiveAngle % 360) + 360) % 360;
   const isSideways = normAngle % 180 !== 0;
   const scaleRatio = isSideways ? 0.72 : 1;
   const displayNum = displayPageNum ?? pageNum;
+  const shouldDisplayAngle = showAngle ?? (angle !== undefined);
 
   return (
     <div
@@ -182,18 +186,20 @@ export default function PdfZoomModal({
                   <span>Rotate Right</span>
                 </button>
 
-                <span
-                  style={{
-                    fontSize: "0.8125rem",
-                    fontWeight: 800,
-                    color: normAngle !== 0 ? "var(--primary)" : "var(--text-muted)",
-                    padding: "0 0.35rem",
-                    minWidth: "36px",
-                    textAlign: "center",
-                  }}
-                >
-                  {normAngle}°
-                </span>
+                {shouldDisplayAngle && (
+                  <span
+                    style={{
+                      fontSize: "0.8125rem",
+                      fontWeight: 800,
+                      color: normAngle !== 0 ? "var(--primary)" : "var(--text-muted)",
+                      padding: "0 0.35rem",
+                      minWidth: "36px",
+                      textAlign: "center",
+                    }}
+                  >
+                    {normAngle}°
+                  </span>
+                )}
               </div>
             )}
 
