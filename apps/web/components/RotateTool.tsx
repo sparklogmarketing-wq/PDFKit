@@ -11,13 +11,6 @@ import { formatBytes } from "../lib/format";
 import type { OutputFile } from "@pdfkit/core";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-}
 
 function parseRangePart(trimmed: string, maxPages: number, result: Set<number>) {
   if (trimmed.includes("-")) {
@@ -1192,11 +1185,18 @@ export default function RotateTool() {
   /* ── RENDER: Results View ────────────────────────────────── */
   if (results.length > 0) {
     return (
-      <RotateResultsView
+      <ToolResultsView
+        title="PDFs Rotated Successfully!"
+        subtitle={
+          results.length === 1
+            ? "Your rotated document is ready to download."
+            : `All ${results.length} documents have been rotated and are ready.`
+        }
         results={results}
+        resetLabel="Rotate More Files"
+        onReset={clearAllFiles}
+        onDownloadZip={() => { void handleDownloadAllZip(); }}
         isZipping={isZipping}
-        onDownloadAllZip={() => { void handleDownloadAllZip(); }}
-        onRotateMore={clearAllFiles}
       />
     );
   }
@@ -1217,36 +1217,13 @@ export default function RotateTool() {
           }}
         />
 
-        <div className="dropzone-container">
-          <div
-            className={`dropzone ${isDragging ? "active" : ""}`}
-            role="button"
-            tabIndex={0}
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
-            onClick={() => fileInputRef.current?.click()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                fileInputRef.current?.click();
-              }
-            }}
-          >
-            <svg aria-hidden="true" className="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-
-            <p className="dropzone-text-primary">
-              Choose PDF files, or drag and drop here
-            </p>
-            <span className="dropzone-badge">
-              Multiple files (.pdf)
-            </span>
-          </div>
-        </div>
+        <PdfDropzone
+          isDragging={isDragging}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+          onClick={() => fileInputRef.current?.click()}
+        />
 
         {error && (
           <div className="alert-error" style={{ marginTop: "1rem" }}>
@@ -1273,47 +1250,15 @@ export default function RotateTool() {
       />
 
       {/* Top Upload Banner */}
-      <div className="dropzone-container" style={{ marginBottom: "1.25rem" }}>
-        <div
-          className={`dropzone ${isDragging ? "active" : ""}`}
-          role="button"
-          tabIndex={0}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-          onClick={() => fileInputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              fileInputRef.current?.click();
-            }
-          }}
-          style={{ padding: "1.25rem", minHeight: "auto" }}
-        >
-          <svg
-            aria-hidden="true"
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ color: "var(--primary)" }}
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-          <p className="dropzone-text-primary" style={{ margin: 0, fontSize: "0.9375rem" }}>
-            Click or drop more files to add
-          </p>
-          <span className="dropzone-badge" style={{ margin: 0 }}>
-            {files.length} {files.length === 1 ? "PDF" : "PDFs"} selected ({totalPagesAllFiles} pages total)
-          </span>
-        </div>
-      </div>
+      <PdfDropzone
+        isCompact
+        isDragging={isDragging}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        onClick={() => fileInputRef.current?.click()}
+        badgeText={`${files.length} ${files.length === 1 ? "PDF" : "PDFs"} selected (${totalPagesAllFiles} pages total)`}
+      />
 
       {/* 2-Column Interface: Left = All Pages Preview, Right = 3 Tabs Control Panel */}
       <div
