@@ -2048,4 +2048,50 @@ a {
   .rotate-workspace-layout {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Shared 2-Column Panels ── */
+.tool-left-panel {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  min-height: 560px;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.tool-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1.5px solid var(--border-light);
+  padding-bottom: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.tool-clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--danger);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tool-sticky-panel {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 5.5rem;
+  max-height: calc(100vh - 7rem);
+  overflow-y: auto;
+  min-width: 0;
+  box-sizing: border-box;
+  z-index: 10;
 }

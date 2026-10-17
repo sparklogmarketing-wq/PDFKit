@@ -7,7 +7,7 @@ import { downloadFilesAsZip } from "../lib/downloadZip";
 import PdfZoomModal from "./PdfZoomModal";
 import ToolResultsView from "./ToolResultsView";
 import PdfDropzone from "./PdfDropzone";
-import { formatBytes } from "../lib/format";
+import ToolProgressBar from "./ToolProgressBar";
 import type { OutputFile } from "@pdfkit/core";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -644,50 +644,11 @@ function RotateFooter({
       </div>
 
       {isRunning ? (
-        <div>
-          <div
-            style={{
-              width: "100%",
-              height: 8,
-              borderRadius: 99,
-              background: "var(--border-light)",
-              overflow: "hidden",
-              marginBottom: "0.6rem",
-            }}
-          >
-            <div
-              style={{
-                width: `${progress ?? 0}%`,
-                height: "100%",
-                background: "var(--primary)",
-                borderRadius: 99,
-                transition: "width 0.2s ease",
-              }}
-            />
-          </div>
-          <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", textAlign: "center", marginBottom: "0.75rem" }}>
-            {statusMsg}
-          </p>
-          {cancel && (
-            <button
-              type="button"
-              onClick={cancel}
-              style={{
-                width: "100%",
-                padding: "0.5rem",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--danger-border)",
-                background: "var(--danger-subtle)",
-                color: "var(--danger)",
-                fontWeight: 700,
-                fontSize: "0.8125rem",
-                cursor: "pointer",
-              }}
-            >
-              Cancel
-            </button>
-          )}
-        </div>
+        <ToolProgressBar
+          progress={progress ? progress / 100 : 0}
+          statusMsg={statusMsg}
+          onCancel={cancel}
+        />
       ) : (
         <button
           type="button"
@@ -768,22 +729,7 @@ function RotateRightPanel({
   readonly onRotateSubmit: () => void;
 }) {
   return (
-    <div
-      style={{
-        background: "var(--bg-surface)",
-        border: "1.5px solid var(--border-light)",
-        borderRadius: "var(--radius-lg)",
-        padding: "1.5rem",
-        boxShadow: "var(--shadow-sm)",
-        position: "sticky",
-        top: "5.5rem",
-        maxHeight: "calc(100vh - 7rem)",
-        overflowY: "auto",
-        minWidth: 0,
-        boxSizing: "border-box",
-        zIndex: 10,
-      }}
-    >
+    <div className="tool-sticky-panel">
       {/* Tab Navigation */}
       <div
         style={{
@@ -1261,42 +1207,11 @@ export default function RotateTool() {
       />
 
       {/* 2-Column Interface: Left = All Pages Preview, Right = 3 Tabs Control Panel */}
-      <div
-        className="rotate-workspace-layout"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) 360px",
-          gap: "1.5rem",
-          alignItems: "start",
-          width: "100%",
-          boxSizing: "border-box",
-        }}
-      >
+      <div className="rotate-workspace-layout">
         {/* LEFT PANEL: Preview of all pages of all selected PDFs */}
-        <div
-          style={{
-            background: "var(--bg-surface)",
-            border: "1.5px solid var(--border-light)",
-            borderRadius: "var(--radius-lg)",
-            padding: "1.5rem",
-            boxShadow: "var(--shadow-sm)",
-            minHeight: "560px",
-            minWidth: 0,
-            overflowX: "hidden",
-            boxSizing: "border-box",
-          }}
-        >
+        <div className="tool-left-panel">
           {/* Header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              borderBottom: "1.5px solid var(--border-light)",
-              paddingBottom: "0.875rem",
-              marginBottom: "1.5rem",
-            }}
-          >
+          <div className="tool-panel-header">
             <div>
               <h2 style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--text-main)", margin: 0 }}>
                 Pages Preview
@@ -1310,14 +1225,7 @@ export default function RotateTool() {
               <button
                 type="button"
                 onClick={clearAllFiles}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "var(--danger)",
-                  fontSize: "0.8125rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
+                className="tool-clear-btn"
               >
                 Clear All
               </button>
