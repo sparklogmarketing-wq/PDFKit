@@ -1,315 +1,24 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { getPdfInfo } from "../lib/pdfjs";
 import { runTool } from "../lib/runTool";
 import PdfZoomModal from "./PdfZoomModal";
+import PdfThumbnailCard from "./PdfThumbnailCard";
+import ToolResultsView from "./ToolResultsView";
+import PdfDropzone from "./PdfDropzone";
 import type { OutputFile } from "@pdfkit/core";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+function resolveMergedFileName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "merged.pdf";
+  if (trimmed.toLowerCase().endsWith(".pdf")) return trimmed;
+  return `${trimmed}.pdf`;
 }
 
-/* ── Left Panel: Document Thumbnail Card ─────────────────────── */
-function MergeDocumentCard({
-  file,
-  index,
-  numPages,
-  isDragging,
-  isDropTarget,
-  disabled,
-  isRotating,
-  onDragStart,
-  onDragOver,
-  onDragEnter,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
-  onZoom,
-  onRotate,
-  onRemove,
-}: {
-  readonly file: File;
-  readonly index: number;
-  readonly numPages: number | null;
-  readonly isDragging: boolean;
-  readonly isDropTarget: boolean;
-  readonly disabled?: boolean;
-  readonly isRotating?: boolean;
-  readonly onDragStart: (e: React.DragEvent, index: number) => void;
-  readonly onDragOver: (e: React.DragEvent, index: number) => void;
-  readonly onDragEnter: (e: React.DragEvent, index: number) => void;
-  readonly onDragLeave: (e: React.DragEvent, index: number) => void;
-  readonly onDrop: (e: React.DragEvent, index: number) => void;
-  readonly onDragEnd: () => void;
-  readonly onZoom: (file: File, index: number) => void;
-  readonly onRotate: (index: number) => void;
-  readonly onRemove: (index: number) => void;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-
-    if (canvasRef.current) {
-      void renderPdfPage(file, canvasRef.current, 1, 320)
-        .then(() => {
-          if (active) setLoading(false);
-        })
-        .catch(() => {
-          if (active) setLoading(false);
-        });
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [file]);
-
-  return (
-    <div
-      className={`pdf-thumb-card ${isDragging ? "dragging" : ""} ${isDropTarget ? "drop-target" : ""}`}
-      draggable={!disabled && !isRotating}
-      onDragStart={(e) => onDragStart(e, index)}
-      onDragOver={(e) => onDragOver(e, index)}
-      onDragEnter={(e) => onDragEnter(e, index)}
-      onDragLeave={(e) => onDragLeave(e, index)}
-      onDrop={(e) => onDrop(e, index)}
-      onDragEnd={onDragEnd}
-      title="Drag to reorder sequence"
-    >
-      {/* Top Header Row of Card */}
-      <div className="pdf-thumb-card-header">
-        <span className="pdf-thumb-order-badge" title={`Order sequence: #${index + 1}`}>
-          {index + 1}
-        </span>
-        <div className="pdf-thumb-card-tools">
-          {/* Rotate Button */}
-          <button
-            type="button"
-            className={`pdf-thumb-action-btn rotate-btn ${isRotating ? "rotating" : ""}`}
-            disabled={disabled || isRotating}
-            onClick={(e) => {
-              e.stopPropagation();
-              onRotate(index);
-            }}
-            title="Rotate 90° clockwise"
-            aria-label="Rotate PDF"
-          >
-            <svg
-              aria-hidden="true"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21.5 2v6h-6" />
-              <path d="M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-            </svg>
-          </button>
-
-          {/* Zoom Preview Button */}
-          <button
-            type="button"
-            className="pdf-thumb-action-btn zoom-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onZoom(file, index);
-            }}
-            title="Zoom in / Preview document"
-            aria-label="Zoom in"
-          >
-            <svg
-              aria-hidden="true"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              <line x1="11" y1="8" x2="11" y2="14" />
-              <line x1="8" y1="11" x2="14" y2="11" />
-            </svg>
-          </button>
-
-          {/* Remove Button */}
-          <button
-            type="button"
-            className="pdf-thumb-action-btn delete-btn"
-            disabled={disabled || isRotating}
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove(index);
-            }}
-            title="Remove from merge list"
-            aria-label="Remove"
-          >
-            &times;
-          </button>
-        </div>
-      </div>
-
-      {/* PDF Document Sheet Preview */}
-      <div className="pdf-thumb-sheet-wrapper">
-        <div className="pdf-thumb-sheet">
-          {(loading || isRotating) && (
-            <div className="pdf-thumb-skeleton">
-              <div className="pdf-thumb-spinner" />
-            </div>
-          )}
-          <canvas ref={canvasRef} className="pdf-thumb-canvas" />
-        </div>
-      </div>
-
-      {/* File Meta Info */}
-      <div className="pdf-thumb-footer">
-        <span className="pdf-thumb-filename" title={file.name}>
-          {file.name}
-        </span>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", marginTop: "0.25rem" }}>
-          <span className="pdf-thumb-pages-count">
-            {numPages !== null ? `${numPages} ${numPages === 1 ? "page" : "pages"}` : "1 page"}
-          </span>
-          <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
-            {formatBytes(file.size)}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Results View ────────────────────────────────────────────── */
-function MergeResultsView({
-  results,
-  onReset,
-}: {
-  readonly results: readonly { readonly name: string; readonly url: string; readonly size: number }[];
-  readonly onReset: () => void;
-}) {
-  const resultFile = results[0];
-  if (!resultFile) return null;
-
-  return (
-    <div className="tool-runner-panel" style={{ maxWidth: 860, margin: "0 auto" }}>
-      <div
-        style={{
-          background: "var(--bg-surface)",
-          border: "1.5px solid var(--border-light)",
-          borderRadius: "var(--radius-lg)",
-          padding: "2.5rem 2rem",
-          boxShadow: "var(--shadow-md)",
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: "50%",
-            background: "var(--success-subtle)",
-            border: "1.5px solid var(--success-border)",
-            color: "var(--success)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto 1.25rem",
-          }}
-        >
-          <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-        </div>
-
-        <h2 style={{ fontSize: "1.625rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.5rem" }}>
-          PDFs Merged Successfully!
-        </h2>
-        <p style={{ color: "var(--text-secondary)", fontSize: "0.9375rem", marginBottom: "2rem" }}>
-          Your combined PDF document is ready for download.
-        </p>
-
-        <div
-          style={{
-            maxWidth: 500,
-            margin: "0 auto 2.5rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "1rem 1.25rem",
-            background: "var(--bg-subtle)",
-            border: "1px solid var(--border-light)",
-            borderRadius: "var(--radius-md)",
-            textAlign: "left",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", overflow: "hidden" }}>
-            <div style={{ color: "var(--primary)", flexShrink: 0 }}>
-              <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="8" y="2" width="13" height="15" rx="2" />
-                <path d="M4 8v12a2 2 0 0 0 2 2h12" />
-              </svg>
-            </div>
-            <div style={{ overflow: "hidden" }}>
-              <div style={{ fontWeight: 700, color: "var(--text-main)", textOverflow: "ellipsis", whiteSpace: "nowrap", overflow: "hidden", fontSize: "0.9375rem" }}>
-                {resultFile.name}
-              </div>
-              <div style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
-                {formatBytes(resultFile.size)}
-              </div>
-            </div>
-          </div>
-
-          <a
-            href={resultFile.url}
-            download={resultFile.name}
-            className="btn-primary"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.45rem",
-              padding: "0.6rem 1.25rem",
-              fontSize: "0.9375rem",
-              textDecoration: "none",
-              flexShrink: 0,
-            }}
-          >
-            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            <span>Download</span>
-          </a>
-        </div>
-
-        <button
-          type="button"
-          onClick={onReset}
-          className="btn-secondary"
-          style={{ padding: "0.65rem 1.75rem" }}
-        >
-          Merge More Files
-        </button>
-      </div>
-    </div>
-  );
+function handleCardDragLeave() {
+  // no-op drag leave
 }
 
 /* ── Right Panel: Controls & Sequence Manager ────────────────── */
@@ -864,9 +573,7 @@ export default function MergeTool() {
     setDragOverIdx(index);
   }
 
-  function handleCardDragLeave() {
-    // leave
-  }
+// drag leave handled in outer scope
 
   function handleCardDrop(e: React.DragEvent, dropIndex: number) {
     e.preventDefault();
@@ -908,10 +615,7 @@ export default function MergeTool() {
       setCancel(() => job.cancel);
       const outputs: OutputFile[] = await job.promise;
 
-      const trimmedName = outputFileName.trim();
-      const finalName = trimmedName
-        ? (trimmedName.toLowerCase().endsWith(".pdf") ? trimmedName : `${trimmedName}.pdf`)
-        : "merged.pdf";
+      const finalName = resolveMergedFileName(outputFileName);
 
       const res = outputs.map((out) => {
         const blob = new Blob([out.data as BlobPart], { type: out.mime || "application/pdf" });
@@ -964,8 +668,11 @@ export default function MergeTool() {
   /* ── RENDER: Results View ────────────────────────────────── */
   if (results.length > 0) {
     return (
-      <MergeResultsView
+      <ToolResultsView
+        title="PDFs Merged Successfully!"
+        subtitle="Your combined PDF document is ready for download."
         results={results}
+        resetLabel="Merge More Files"
         onReset={clearAllFiles}
       />
     );
@@ -987,36 +694,13 @@ export default function MergeTool() {
           }}
         />
 
-        <div className="dropzone-container">
-          <div
-            className={`dropzone ${isDragging ? "active" : ""}`}
-            role="button"
-            tabIndex={0}
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
-            onClick={() => fileInputRef.current?.click()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                fileInputRef.current?.click();
-              }
-            }}
-          >
-            <svg aria-hidden="true" className="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-
-            <p className="dropzone-text-primary">
-              Choose PDF files, or drag and drop here
-            </p>
-            <span className="dropzone-badge">
-              Multiple files (.pdf)
-            </span>
-          </div>
-        </div>
+        <PdfDropzone
+          isDragging={isDragging}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+          onClick={() => fileInputRef.current?.click()}
+        />
 
         {error && (
           <div className="alert-error" style={{ marginTop: "1rem" }}>
@@ -1043,47 +727,15 @@ export default function MergeTool() {
       />
 
       {/* Top Upload Banner */}
-      <div className="dropzone-container" style={{ marginBottom: "1.25rem" }}>
-        <div
-          className={`dropzone ${isDragging ? "active" : ""}`}
-          role="button"
-          tabIndex={0}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-          onClick={() => fileInputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              fileInputRef.current?.click();
-            }
-          }}
-          style={{ padding: "1.25rem", minHeight: "auto" }}
-        >
-          <svg
-            aria-hidden="true"
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ color: "var(--primary)" }}
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-          <p className="dropzone-text-primary" style={{ margin: 0, fontSize: "0.9375rem" }}>
-            Click or drop more files to add
-          </p>
-          <span className="dropzone-badge" style={{ margin: 0 }}>
-            {files.length} {files.length === 1 ? "PDF" : "PDFs"} selected ({totalPagesAllFiles} pages total)
-          </span>
-        </div>
-      </div>
+      <PdfDropzone
+        isCompact
+        isDragging={isDragging}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        onClick={() => fileInputRef.current?.click()}
+        badgeText={`${files.length} ${files.length === 1 ? "PDF" : "PDFs"} selected (${totalPagesAllFiles} pages total)`}
+      />
 
       {/* 2-Column Interface: Left = Files Preview Grid, Right = Merge Sequence & Controls */}
       <div
@@ -1152,7 +804,7 @@ export default function MergeTool() {
           {/* Cards Grid */}
           <div className="pdf-thumbs-grid">
             {files.map((file, idx) => (
-              <MergeDocumentCard
+              <PdfThumbnailCard
                 key={`${file.name}-${idx}`}
                 file={file}
                 index={idx}

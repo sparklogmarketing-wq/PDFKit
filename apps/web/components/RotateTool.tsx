@@ -5,6 +5,9 @@ import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
 import { runTool } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import PdfZoomModal from "./PdfZoomModal";
+import ToolResultsView from "./ToolResultsView";
+import PdfDropzone from "./PdfDropzone";
+import { formatBytes } from "../lib/format";
 import type { OutputFile } from "@pdfkit/core";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -273,157 +276,457 @@ function RotatePageCard({
   );
 }
 
-/* ── Results View ────────────────────────────────────────────── */
-function RotateResultsView({
-  results,
-  isZipping,
-  onDownloadAllZip,
-  onRotateMore,
+/* ── Right Panel: Tabs & Subcomponents ──────────────────────── */
+type RotateTab = "controls" | "range" | "pages";
+
+function RotateControlsTab({
+  onRotateGlobalLeft,
+  onRotateGlobalRight,
+  onResetAll,
 }: {
-  readonly results: readonly { readonly name: string; readonly url: string; readonly size: number }[];
-  readonly isZipping: boolean;
-  readonly onDownloadAllZip: () => void;
-  readonly onRotateMore: () => void;
+  readonly onRotateGlobalLeft: () => void;
+  readonly onRotateGlobalRight: () => void;
+  readonly onResetAll: () => void;
 }) {
   return (
-    <div className="tool-runner-panel" style={{ maxWidth: 860, margin: "0 auto" }}>
-      <div
-        style={{
-          background: "var(--bg-surface)",
-          border: "1.5px solid var(--border-light)",
-          borderRadius: "var(--radius-lg)",
-          padding: "2.5rem 2rem",
-          boxShadow: "var(--shadow-md)",
-          textAlign: "center",
-        }}
-      >
-        <div
+    <div>
+      <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.35rem" }}>
+        Rotate Controls
+      </h3>
+      <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
+        Choose rotation direction for all selected PDFs. Pages configured in tabs 2 & 3 will remain protected.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.875rem" }}>
+        <button
+          type="button"
+          onClick={onRotateGlobalLeft}
           style={{
-            width: 64,
-            height: 64,
-            borderRadius: "50%",
-            background: "var(--success-subtle)",
-            border: "1.5px solid var(--success-border)",
-            color: "var(--success)",
+            padding: "1rem 0.5rem",
+            borderRadius: "var(--radius-md)",
+            border: "1.5px solid var(--border-medium)",
+            background: "var(--bg-surface)",
+            color: "var(--primary)",
+            fontWeight: 800,
+            fontSize: "0.9375rem",
+            cursor: "pointer",
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto 1.25rem",
+            gap: "0.35rem",
+            boxShadow: "0 2px 6px rgba(124,58,237,0.08)",
+            transition: "all 0.15s ease",
           }}
         >
-          <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
+          <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="1 4 1 10 7 10" />
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
           </svg>
-        </div>
-
-        <h2 style={{ fontSize: "1.625rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.5rem" }}>
-          PDFs Rotated Successfully!
-        </h2>
-        <p style={{ color: "var(--text-secondary)", fontSize: "0.9375rem", marginBottom: "2rem" }}>
-          {results.length === 1
-            ? "Your rotated document is ready to download."
-            : `All ${results.length} documents have been rotated and are ready.`}
-        </p>
-
-        {results.length > 1 && (
-          <div style={{ marginBottom: "2rem" }}>
-            <button
-              type="button"
-              onClick={onDownloadAllZip}
-              disabled={isZipping}
-              className="btn-primary"
-              style={{
-                fontSize: "1.0625rem",
-                padding: "0.875rem 2rem",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.6rem",
-                boxShadow: "var(--shadow-md)",
-              }}
-            >
-              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span>{isZipping ? "Creating ZIP..." : `Download All ${results.length} PDFs (ZIP)`}</span>
-            </button>
-          </div>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", textAlign: "left", marginBottom: "2.5rem" }}>
-          {results.map((r, i) => (
-            <div
-              key={`${r.name}-${i}`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "0.875rem 1.25rem",
-                background: "var(--bg-subtle)",
-                border: "1px solid var(--border-light)",
-                borderRadius: "var(--radius-md)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", overflow: "hidden" }}>
-                <div style={{ color: "var(--primary)" }}>
-                  <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <path d="M10 12h4" />
-                    <path d="M10 16h4" />
-                  </svg>
-                </div>
-                <div style={{ overflow: "hidden" }}>
-                  <div style={{ fontWeight: 600, color: "var(--text-main)", textOverflow: "ellipsis", whiteSpace: "nowrap", overflow: "hidden" }}>
-                    {r.name}
-                  </div>
-                  <div style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
-                    {formatBytes(r.size)}
-                  </div>
-                </div>
-              </div>
-
-              <a
-                href={r.url}
-                download={r.name}
-                className="btn-secondary"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.4rem",
-                  padding: "0.5rem 1rem",
-                  fontSize: "0.875rem",
-                  textDecoration: "none",
-                  flexShrink: 0,
-                }}
-              >
-                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                <span>Download</span>
-              </a>
-            </div>
-          ))}
-        </div>
+          <span>Rotate Left</span>
+          <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)", fontWeight: 500 }}>90° CCW</span>
+        </button>
 
         <button
           type="button"
-          onClick={onRotateMore}
-          className="btn-secondary"
-          style={{ padding: "0.65rem 1.5rem" }}
+          onClick={onRotateGlobalRight}
+          style={{
+            padding: "1rem 0.5rem",
+            borderRadius: "var(--radius-md)",
+            border: "1.5px solid var(--border-medium)",
+            background: "var(--bg-surface)",
+            color: "var(--primary)",
+            fontWeight: 800,
+            fontSize: "0.9375rem",
+            cursor: "pointer",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "0.35rem",
+            boxShadow: "0 2px 6px rgba(124,58,237,0.08)",
+            transition: "all 0.15s ease",
+          }}
         >
-          Rotate More Files
+          <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+          </svg>
+          <span>Rotate Right</span>
+          <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)", fontWeight: 500 }}>90° CW</span>
+        </button>
+      </div>
+
+      <div style={{ marginBottom: "1.5rem" }}>
+        <button
+          type="button"
+          onClick={onResetAll}
+          style={{
+            width: "100%",
+            padding: "0.65rem 0.5rem",
+            borderRadius: "var(--radius-md)",
+            border: "1.5px solid var(--border-light)",
+            background: "#ffffff",
+            color: "var(--text-secondary)",
+            fontWeight: 700,
+            fontSize: "0.875rem",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.4rem",
+          }}
+        >
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+          </svg>
+          <span>Reset All to 0°</span>
         </button>
       </div>
     </div>
   );
 }
 
-/* ── Right Panel: Tabs Component ─────────────────────────────── */
+function RotateRangeTab({
+  totalPagesAllFiles,
+  rangeEnabled,
+  setRangeEnabled,
+  rangeFrom,
+  setRangeFrom,
+  rangeTo,
+  setRangeTo,
+}: {
+  readonly totalPagesAllFiles: number;
+  readonly rangeEnabled: boolean;
+  readonly setRangeEnabled: (val: boolean) => void;
+  readonly rangeFrom: number;
+  readonly setRangeFrom: (val: number) => void;
+  readonly rangeTo: number;
+  readonly setRangeTo: (val: number) => void;
+}) {
+  return (
+    <div>
+      <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.35rem" }}>
+        Range to NOT Rotate
+      </h3>
+      <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
+        Select a range of page numbers (e.g. from 1 to {Math.min(totalPagesAllFiles || 1, 3)}) that should stay in their original state and NOT be rotated.
+      </p>
+
+      <div
+        style={{
+          background: "#fffbeb",
+          border: "1.5px solid #fde68a",
+          borderRadius: "var(--radius-md)",
+          padding: "1rem",
+          marginBottom: "1.25rem",
+        }}
+      >
+        <label
+          htmlFor="range-exclude-checkbox"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            fontSize: "0.875rem",
+            fontWeight: 700,
+            color: "#92400e",
+            cursor: "pointer",
+            marginBottom: "1rem",
+          }}
+        >
+          <input
+            id="range-exclude-checkbox"
+            type="checkbox"
+            checked={rangeEnabled}
+            onChange={(e) => setRangeEnabled(e.target.checked)}
+            style={{ accentColor: "var(--primary)", width: "16px", height: "16px", cursor: "pointer" }}
+          />
+          <span>Exclude a Range of Pages</span>
+        </label>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+          <div>
+            <label htmlFor="range-from-input" style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#92400e", marginBottom: "0.25rem" }}>
+              From Page:
+            </label>
+            <input
+              id="range-from-input"
+              type="number"
+              min={1}
+              max={totalPagesAllFiles || 1}
+              value={rangeFrom}
+              disabled={!rangeEnabled}
+              onChange={(e) => setRangeFrom(Math.max(1, Number(e.target.value) || 1))}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.6rem",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid #fde68a",
+                background: rangeEnabled ? "#ffffff" : "#fef3c7",
+                fontSize: "0.875rem",
+                fontWeight: 700,
+              }}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="range-to-input" style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#92400e", marginBottom: "0.25rem" }}>
+              To Page:
+            </label>
+            <input
+              id="range-to-input"
+              type="number"
+              min={1}
+              max={totalPagesAllFiles || 1}
+              value={rangeTo}
+              disabled={!rangeEnabled}
+              onChange={(e) => setRangeTo(Math.max(1, Number(e.target.value) || 1))}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.6rem",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid #fde68a",
+                background: rangeEnabled ? "#ffffff" : "#fef3c7",
+                fontSize: "0.875rem",
+                fontWeight: 700,
+              }}
+            />
+          </div>
+        </div>
+
+        {rangeEnabled && (
+          <div style={{ fontSize: "0.75rem", color: "#b45309", fontWeight: 600 }}>
+            ✓ Pages {Math.min(rangeFrom, rangeTo)} to {Math.max(rangeFrom, rangeTo)} will remain at 0° (Original state).
+          </div>
+        )}
+      </div>
+
+      {rangeEnabled && (
+        <button
+          type="button"
+          onClick={() => setRangeEnabled(false)}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "var(--danger)",
+            fontSize: "0.8125rem",
+            fontWeight: 600,
+            cursor: "pointer",
+            marginBottom: "1rem",
+          }}
+        >
+          Clear Range Protection
+        </button>
+      )}
+    </div>
+  );
+}
+
+function RotatePagesTab({
+  notRotatePagesInput,
+  setNotRotatePagesInput,
+  excludedSpecificPagesSet,
+}: {
+  readonly notRotatePagesInput: string;
+  readonly setNotRotatePagesInput: (val: string) => void;
+  readonly excludedSpecificPagesSet: ReadonlySet<number>;
+}) {
+  return (
+    <div>
+      <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.35rem" }}>
+        Specific Pages to NOT Rotate
+      </h3>
+      <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
+        Enter individual page numbers that should NOT be rotated and stay in their original state.
+      </p>
+
+      <div style={{ marginBottom: "1rem" }}>
+        <label htmlFor="specific-pages-input" style={{ display: "block", fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-main)", marginBottom: "0.35rem" }}>
+          Pages to Keep in Original State:
+        </label>
+        <input
+          id="specific-pages-input"
+          type="text"
+          value={notRotatePagesInput}
+          onChange={(e) => setNotRotatePagesInput(e.target.value)}
+          placeholder="e.g. 1, 2, 7"
+          style={{
+            width: "100%",
+            padding: "0.65rem 0.85rem",
+            borderRadius: "var(--radius-md)",
+            border: "1.5px solid var(--border-medium)",
+            fontSize: "0.9375rem",
+            outline: "none",
+          }}
+        />
+        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem", display: "block" }}>
+          Comma-separated list (e.g. <code>1, 2, 7</code> or <code>1, 3-5</code>).
+        </span>
+      </div>
+
+      {excludedSpecificPagesSet.size > 0 && (
+        <div
+          style={{
+            padding: "0.75rem",
+            background: "#fffbeb",
+            border: "1px solid #fde68a",
+            borderRadius: "var(--radius-md)",
+            marginBottom: "1.25rem",
+          }}
+        >
+          <span style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#92400e", marginBottom: "0.35rem" }}>
+            Protected Pages (Not Rotated):
+          </span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+            {Array.from(excludedSpecificPagesSet).sort((a, b) => a - b).map((p) => (
+              <span
+                key={p}
+                style={{
+                  fontSize: "0.6875rem",
+                  fontWeight: 700,
+                  padding: "0.15rem 0.45rem",
+                  borderRadius: "4px",
+                  background: "#ffffff",
+                  border: "1px solid #fde68a",
+                  color: "#b45309",
+                }}
+              >
+                p. {p} (0°)
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {notRotatePagesInput.trim() && (
+        <button
+          type="button"
+          onClick={() => setNotRotatePagesInput("")}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "var(--danger)",
+            fontSize: "0.8125rem",
+            fontWeight: 600,
+            cursor: "pointer",
+            marginBottom: "1rem",
+          }}
+        >
+          Clear Excluded Pages
+        </button>
+      )}
+    </div>
+  );
+}
+
+function RotateFooter({
+  filesCount,
+  totalPagesAllFiles,
+  isRunning,
+  progress,
+  statusMsg,
+  cancel,
+  error,
+  onRotateSubmit,
+}: {
+  readonly filesCount: number;
+  readonly totalPagesAllFiles: number;
+  readonly isRunning: boolean;
+  readonly progress: number | null;
+  readonly statusMsg: string;
+  readonly cancel: (() => void) | null;
+  readonly error: string;
+  readonly onRotateSubmit: () => void;
+}) {
+  return (
+    <div
+      style={{
+        paddingTop: "1.25rem",
+        borderTop: "1.5px solid var(--border-light)",
+        marginTop: "0.5rem",
+      }}
+    >
+      <div style={{ marginBottom: "1rem", fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
+        Rotating <strong>{filesCount}</strong> {filesCount === 1 ? "PDF" : "PDFs"} (<strong>{totalPagesAllFiles}</strong> total pages).
+      </div>
+
+      {isRunning ? (
+        <div>
+          <div
+            style={{
+              width: "100%",
+              height: 8,
+              borderRadius: 99,
+              background: "var(--border-light)",
+              overflow: "hidden",
+              marginBottom: "0.6rem",
+            }}
+          >
+            <div
+              style={{
+                width: `${progress ?? 0}%`,
+                height: "100%",
+                background: "var(--primary)",
+                borderRadius: 99,
+                transition: "width 0.2s ease",
+              }}
+            />
+          </div>
+          <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", textAlign: "center", marginBottom: "0.75rem" }}>
+            {statusMsg}
+          </p>
+          {cancel && (
+            <button
+              type="button"
+              onClick={cancel}
+              style={{
+                width: "100%",
+                padding: "0.5rem",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--danger-border)",
+                background: "var(--danger-subtle)",
+                color: "var(--danger)",
+                fontWeight: 700,
+                fontSize: "0.8125rem",
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onRotateSubmit}
+          className="btn-primary"
+          style={{
+            width: "100%",
+            padding: "0.875rem 1rem",
+            fontSize: "1.0625rem",
+            fontWeight: 800,
+            borderRadius: "var(--radius-md)",
+            boxShadow: "var(--shadow-md)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+          }}
+        >
+          <span>{filesCount > 1 ? `Rotate ${filesCount} PDFs` : "Rotate PDF"}</span>
+        </button>
+      )}
+
+      {error && (
+        <div className="alert-error" style={{ marginTop: "1rem" }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RotateRightPanel({
   filesCount,
   totalPagesAllFiles,
@@ -450,8 +753,8 @@ function RotateRightPanel({
 }: {
   readonly filesCount: number;
   readonly totalPagesAllFiles: number;
-  readonly activeTab: "controls" | "range" | "pages";
-  readonly setActiveTab: (tab: "controls" | "range" | "pages") => void;
+  readonly activeTab: RotateTab;
+  readonly setActiveTab: (tab: RotateTab) => void;
   readonly isRunning: boolean;
   readonly progress: number | null;
   readonly statusMsg: string;
@@ -559,397 +862,44 @@ function RotateRightPanel({
         </button>
       </div>
 
-      {/* TAB 1: Rotation Left & Right Controls */}
       {activeTab === "controls" && (
-        <div>
-          <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.35rem" }}>
-            Rotate Controls
-          </h3>
-          <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
-            Choose rotation direction for all selected PDFs. Pages configured in tabs 2 & 3 will remain protected.
-          </p>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.875rem" }}>
-            <button
-              type="button"
-              onClick={onRotateGlobalLeft}
-              style={{
-                padding: "1rem 0.5rem",
-                borderRadius: "var(--radius-md)",
-                border: "1.5px solid var(--border-medium)",
-                background: "var(--bg-surface)",
-                color: "var(--primary)",
-                fontWeight: 800,
-                fontSize: "0.9375rem",
-                cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "0.35rem",
-                boxShadow: "0 2px 6px rgba(124,58,237,0.08)",
-                transition: "all 0.15s ease",
-              }}
-            >
-              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="1 4 1 10 7 10" />
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-              </svg>
-              <span>Rotate Left</span>
-              <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)", fontWeight: 500 }}>90° CCW</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onRotateGlobalRight}
-              style={{
-                padding: "1rem 0.5rem",
-                borderRadius: "var(--radius-md)",
-                border: "1.5px solid var(--border-medium)",
-                background: "var(--bg-surface)",
-                color: "var(--primary)",
-                fontWeight: 800,
-                fontSize: "0.9375rem",
-                cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "0.35rem",
-                boxShadow: "0 2px 6px rgba(124,58,237,0.08)",
-                transition: "all 0.15s ease",
-              }}
-            >
-              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="23 4 23 10 17 10" />
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-              </svg>
-              <span>Rotate Right</span>
-              <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)", fontWeight: 500 }}>90° CW</span>
-            </button>
-          </div>
-
-          <div style={{ marginBottom: "1.5rem" }}>
-            <button
-              type="button"
-              onClick={onResetAll}
-              style={{
-                width: "100%",
-                padding: "0.65rem 0.5rem",
-                borderRadius: "var(--radius-md)",
-                border: "1.5px solid var(--border-light)",
-                background: "#ffffff",
-                color: "var(--text-secondary)",
-                fontWeight: 700,
-                fontSize: "0.875rem",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.4rem",
-              }}
-            >
-              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="1 4 1 10 7 10" />
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-              </svg>
-              <span>Reset All to Original</span>
-            </button>
-          </div>
-        </div>
+        <RotateControlsTab
+          onRotateGlobalLeft={onRotateGlobalLeft}
+          onRotateGlobalRight={onRotateGlobalRight}
+          onResetAll={onResetAll}
+        />
       )}
 
-      {/* TAB 2: Range to NOT Rotate */}
       {activeTab === "range" && (
-        <div>
-          <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.35rem" }}>
-            Range to NOT Rotate
-          </h3>
-          <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
-            Select a range of page numbers (e.g. from 1 to {Math.min(totalPagesAllFiles || 1, 3)}) that should stay in their original state and NOT be rotated.
-          </p>
-
-          <div
-            style={{
-              background: "#fffbeb",
-              border: "1.5px solid #fde68a",
-              borderRadius: "var(--radius-md)",
-              padding: "1rem",
-              marginBottom: "1.25rem",
-            }}
-          >
-            <label
-              htmlFor="range-exclude-checkbox"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                fontSize: "0.875rem",
-                fontWeight: 700,
-                color: "#92400e",
-                cursor: "pointer",
-                marginBottom: "1rem",
-              }}
-            >
-              <input
-                id="range-exclude-checkbox"
-                type="checkbox"
-                checked={rangeEnabled}
-                onChange={(e) => setRangeEnabled(e.target.checked)}
-                style={{ accentColor: "var(--primary)", width: "16px", height: "16px", cursor: "pointer" }}
-              />
-              <span>Exclude a Range of Pages</span>
-            </label>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
-              <div>
-                <label htmlFor="range-from-input" style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#92400e", marginBottom: "0.25rem" }}>
-                  From Page:
-                </label>
-                <input
-                  id="range-from-input"
-                  type="number"
-                  min={1}
-                  max={totalPagesAllFiles || 1}
-                  value={rangeFrom}
-                  disabled={!rangeEnabled}
-                  onChange={(e) => setRangeFrom(Math.max(1, Number(e.target.value) || 1))}
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem 0.6rem",
-                    borderRadius: "var(--radius-sm)",
-                    border: "1px solid #fde68a",
-                    background: rangeEnabled ? "#ffffff" : "#fef3c7",
-                    fontSize: "0.875rem",
-                    fontWeight: 700,
-                  }}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="range-to-input" style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#92400e", marginBottom: "0.25rem" }}>
-                  To Page:
-                </label>
-                <input
-                  id="range-to-input"
-                  type="number"
-                  min={1}
-                  max={totalPagesAllFiles || 1}
-                  value={rangeTo}
-                  disabled={!rangeEnabled}
-                  onChange={(e) => setRangeTo(Math.max(1, Number(e.target.value) || 1))}
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem 0.6rem",
-                    borderRadius: "var(--radius-sm)",
-                    border: "1px solid #fde68a",
-                    background: rangeEnabled ? "#ffffff" : "#fef3c7",
-                    fontSize: "0.875rem",
-                    fontWeight: 700,
-                  }}
-                />
-              </div>
-            </div>
-
-            {rangeEnabled && (
-              <div style={{ fontSize: "0.75rem", color: "#b45309", fontWeight: 600 }}>
-                ✓ Pages {Math.min(rangeFrom, rangeTo)} to {Math.max(rangeFrom, rangeTo)} will remain at 0° (Original state).
-              </div>
-            )}
-          </div>
-
-          {rangeEnabled && (
-            <button
-              type="button"
-              onClick={() => setRangeEnabled(false)}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "var(--danger)",
-                fontSize: "0.8125rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                marginBottom: "1rem",
-              }}
-            >
-              Clear Range Protection
-            </button>
-          )}
-        </div>
+        <RotateRangeTab
+          totalPagesAllFiles={totalPagesAllFiles}
+          rangeEnabled={rangeEnabled}
+          setRangeEnabled={setRangeEnabled}
+          rangeFrom={rangeFrom}
+          setRangeFrom={setRangeFrom}
+          rangeTo={rangeTo}
+          setRangeTo={setRangeTo}
+        />
       )}
 
-      {/* TAB 3: Specific Pages to NOT Rotate */}
       {activeTab === "pages" && (
-        <div>
-          <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.35rem" }}>
-            Specific Pages to NOT Rotate
-          </h3>
-          <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
-            Enter individual page numbers that should NOT be rotated and stay in their original state.
-          </p>
-
-          <div style={{ marginBottom: "1rem" }}>
-            <label htmlFor="specific-pages-input" style={{ display: "block", fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-main)", marginBottom: "0.35rem" }}>
-              Pages to Keep in Original State:
-            </label>
-            <input
-              id="specific-pages-input"
-              type="text"
-              value={notRotatePagesInput}
-              onChange={(e) => setNotRotatePagesInput(e.target.value)}
-              placeholder="e.g. 1, 2, 7"
-              style={{
-                width: "100%",
-                padding: "0.65rem 0.85rem",
-                borderRadius: "var(--radius-md)",
-                border: "1.5px solid var(--border-medium)",
-                fontSize: "0.9375rem",
-                outline: "none",
-              }}
-            />
-            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem", display: "block" }}>
-              Comma-separated list (e.g. <code>1, 2, 7</code> or <code>1, 3-5</code>).
-            </span>
-          </div>
-
-          {excludedSpecificPagesSet.size > 0 && (
-            <div
-              style={{
-                padding: "0.75rem",
-                background: "#fffbeb",
-                border: "1px solid #fde68a",
-                borderRadius: "var(--radius-md)",
-                marginBottom: "1.25rem",
-              }}
-            >
-              <span style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#92400e", marginBottom: "0.35rem" }}>
-                Protected Pages (Not Rotated):
-              </span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
-                {Array.from(excludedSpecificPagesSet).sort((a, b) => a - b).map((p) => (
-                  <span
-                    key={p}
-                    style={{
-                      fontSize: "0.6875rem",
-                      fontWeight: 700,
-                      padding: "0.15rem 0.45rem",
-                      borderRadius: "4px",
-                      background: "#ffffff",
-                      border: "1px solid #fde68a",
-                      color: "#b45309",
-                    }}
-                  >
-                    p. {p} (0°)
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {notRotatePagesInput.trim() && (
-            <button
-              type="button"
-              onClick={() => setNotRotatePagesInput("")}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "var(--danger)",
-                fontSize: "0.8125rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                marginBottom: "1rem",
-              }}
-            >
-              Clear Excluded Pages
-            </button>
-          )}
-        </div>
+        <RotatePagesTab
+          notRotatePagesInput={notRotatePagesInput}
+          setNotRotatePagesInput={setNotRotatePagesInput}
+          excludedSpecificPagesSet={excludedSpecificPagesSet}
+        />
       )}
 
-      {/* Action & Run Footer in Right Panel */}
-      <div
-        style={{
-          paddingTop: "1.25rem",
-          borderTop: "1.5px solid var(--border-light)",
-          marginTop: "0.5rem",
-        }}
-      >
-        <div style={{ marginBottom: "1rem", fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
-          Rotating <strong>{filesCount}</strong> {filesCount === 1 ? "PDF" : "PDFs"} (<strong>{totalPagesAllFiles}</strong> total pages).
-        </div>
-
-        {isRunning ? (
-          <div>
-            <div
-              style={{
-                width: "100%",
-                height: 8,
-                borderRadius: 99,
-                background: "var(--border-light)",
-                overflow: "hidden",
-                marginBottom: "0.6rem",
-              }}
-            >
-              <div
-                style={{
-                  width: `${progress ?? 0}%`,
-                  height: "100%",
-                  background: "var(--primary)",
-                  borderRadius: 99,
-                  transition: "width 0.2s ease",
-                }}
-              />
-            </div>
-            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", textAlign: "center", marginBottom: "0.75rem" }}>
-              {statusMsg}
-            </p>
-            {cancel && (
-              <button
-                type="button"
-                onClick={cancel}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  borderRadius: "var(--radius-md)",
-                  border: "1px solid var(--danger-border)",
-                  background: "var(--danger-subtle)",
-                  color: "var(--danger)",
-                  fontWeight: 700,
-                  fontSize: "0.8125rem",
-                  cursor: "pointer",
-                }}
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={onRotateSubmit}
-            className="btn-primary"
-            style={{
-              width: "100%",
-              padding: "0.875rem 1rem",
-              fontSize: "1.0625rem",
-              fontWeight: 800,
-              borderRadius: "var(--radius-md)",
-              boxShadow: "var(--shadow-md)",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.5rem",
-            }}
-          >
-            <span>{filesCount > 1 ? `Rotate ${filesCount} PDFs` : "Rotate PDF"}</span>
-          </button>
-        )}
-
-        {error && (
-          <div className="alert-error" style={{ marginTop: "1rem" }}>
-            {error}
-          </div>
-        )}
-      </div>
+      <RotateFooter
+        filesCount={filesCount}
+        totalPagesAllFiles={totalPagesAllFiles}
+        isRunning={isRunning}
+        progress={progress}
+        statusMsg={statusMsg}
+        cancel={cancel}
+        error={error}
+        onRotateSubmit={onRotateSubmit}
+      />
     </div>
   );
 }
@@ -967,7 +917,7 @@ export default function RotateTool() {
   const [pageAngles, setPageAngles] = useState<Record<string, number>>({});
 
   /* Right Panel Tabs: "controls" (Tab 1), "range" (Tab 2), "pages" (Tab 3) */
-  const [activeTab, setActiveTab] = useState<"controls" | "range" | "pages">("controls");
+  const [activeTab, setActiveTab] = useState<RotateTab>("controls");
 
   /* Tab 2: Range of Pages to NOT Rotate */
   const [rangeEnabled, setRangeEnabled] = useState(false);

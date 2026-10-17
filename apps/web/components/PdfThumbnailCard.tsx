@@ -2,28 +2,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { formatBytes, formatPageCount } from "../lib/format";
 
 interface PdfThumbnailCardProps {
-  file: File;
-  index: number;
-  isDragging: boolean;
-  isDropTarget: boolean;
-  disabled?: boolean;
-  isRotating?: boolean;
-  onDragStart: (e: React.DragEvent, index: number) => void;
-  onDragOver: (e: React.DragEvent, index: number) => void;
-  onDragEnter: (e: React.DragEvent, index: number) => void;
-  onDragLeave: (e: React.DragEvent, index: number) => void;
-  onDrop: (e: React.DragEvent, index: number) => void;
-  onDragEnd: () => void;
-  onZoom: (file: File) => void;
-  onRotate: (index: number) => void;
-  onRemove: (index: number) => void;
+  readonly file: File;
+  readonly index: number;
+  readonly numPages?: number | null;
+  readonly isDragging: boolean;
+  readonly isDropTarget: boolean;
+  readonly disabled?: boolean;
+  readonly isRotating?: boolean;
+  readonly onDragStart: (e: React.DragEvent, index: number) => void;
+  readonly onDragOver: (e: React.DragEvent, index: number) => void;
+  readonly onDragEnter: (e: React.DragEvent, index: number) => void;
+  readonly onDragLeave: (e: React.DragEvent, index: number) => void;
+  readonly onDrop: (e: React.DragEvent, index: number) => void;
+  readonly onDragEnd: () => void;
+  readonly onZoom: (file: File, index: number) => void;
+  readonly onRotate: (index: number) => void;
+  readonly onRemove: (index: number) => void;
 }
 
 export default function PdfThumbnailCard({
   file,
   index,
+  numPages: initialNumPages,
   isDragging,
   isDropTarget,
   disabled,
@@ -40,34 +43,43 @@ export default function PdfThumbnailCard({
 }: PdfThumbnailCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
-  const [numPages, setNumPages] = useState<number | null>(null);
+  const [numPages, setNumPages] = useState<number | null>(initialNumPages ?? null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
 
-    // Fetch page count immediately so it appears instantly under every card
-    getPdfInfo(file).then((info) => {
-      if (!active) return;
-      if (info && info.numPages) {
-        setNumPages(info.numPages);
-      }
-    });
+    if (initialNumPages !== undefined && initialNumPages !== null) {
+      setNumPages(initialNumPages);
+    } else {
+      getPdfInfo(file)
+        .then((info) => {
+          if (!active) return;
+          if (info?.numPages) {
+            setNumPages(info.numPages);
+          }
+        })
+        .catch(() => {});
+    }
 
     if (canvasRef.current) {
-      renderPdfPage(file, canvasRef.current, 1, 320).then((res) => {
-        if (!active) return;
-        setLoading(false);
-        if (res && res.numPages) {
-          setNumPages(res.numPages);
-        }
-      });
+      void renderPdfPage(file, canvasRef.current, 1, 320)
+        .then((res) => {
+          if (!active) return;
+          setLoading(false);
+          if (res?.numPages) {
+            setNumPages(res.numPages);
+          }
+        })
+        .catch(() => {
+          if (active) setLoading(false);
+        });
     }
 
     return () => {
       active = false;
     };
-  }, [file]);
+  }, [file, initialNumPages]);
 
   return (
     <div
@@ -102,6 +114,7 @@ export default function PdfThumbnailCard({
             aria-label="Rotate PDF"
           >
             <svg
+              aria-hidden="true"
               width="14"
               height="14"
               viewBox="0 0 24 24"
@@ -122,12 +135,13 @@ export default function PdfThumbnailCard({
             className="pdf-thumb-action-btn zoom-btn"
             onClick={(e) => {
               e.stopPropagation();
-              onZoom(file);
+              onZoom(file, index);
             }}
             title="Zoom in / Preview page"
             aria-label="Zoom in"
           >
             <svg
+              aria-hidden="true"
               width="14"
               height="14"
               viewBox="0 0 24 24"
@@ -161,7 +175,7 @@ export default function PdfThumbnailCard({
         </div>
       </div>
 
-      {/* PDF Document Sheet Preview (Clean preview with no hover overlay) */}
+      {/* PDF Document Sheet Preview */}
       <div className="pdf-thumb-sheet-wrapper">
         <div className="pdf-thumb-sheet">
           {(loading || isRotating) && (
@@ -178,9 +192,14 @@ export default function PdfThumbnailCard({
         <span className="pdf-thumb-filename" title={file.name}>
           {file.name}
         </span>
-        <span className="pdf-thumb-pages-count">
-          {numPages !== null ? `${numPages} ${numPages === 1 ? "page" : "pages"}` : "1 page"}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", marginTop: "0.25rem" }}>
+          <span className="pdf-thumb-pages-count">
+            {formatPageCount(numPages)}
+          </span>
+          <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+            {formatBytes(file.size)}
+          </span>
+        </div>
       </div>
     </div>
   );

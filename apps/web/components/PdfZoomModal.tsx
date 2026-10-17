@@ -69,20 +69,26 @@ export default function PdfZoomModal({
   const shouldDisplayAngle = showAngle ?? (angle !== undefined);
 
   return (
-    <div
-      className="pdf-modal-backdrop"
-      onClick={onClose}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClose(); }}
-      role="button"
-      tabIndex={0}
-      aria-modal="true"
-      aria-label={`Preview of ${file.name} - Page ${displayNum}`}
-    >
-      <div
+    <div className="pdf-modal-backdrop">
+      <button
+        type="button"
+        aria-label="Close preview modal"
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "transparent",
+          border: "none",
+          width: "100%",
+          height: "100%",
+          cursor: "default",
+          zIndex: 0,
+        }}
+      />
+      <dialog
+        open
         className="pdf-modal-container"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-        role="dialog"
+        aria-label={`Preview of ${file.name} - Page ${displayNum}`}
         style={{
           width: "92vw",
           maxWidth: "960px",
@@ -90,6 +96,12 @@ export default function PdfZoomModal({
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
+          position: "relative",
+          zIndex: 1,
+          margin: "auto",
+          padding: 0,
+          background: "#ffffff",
+          color: "inherit",
         }}
       >
         {/* Modal Header */}
@@ -278,7 +290,7 @@ export default function PdfZoomModal({
             </div>
           </div>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }
