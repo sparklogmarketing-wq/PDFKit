@@ -310,7 +310,7 @@ function RemoveRightPanel({
   deletedCount,
   rangeInput,
   onRangeInputChange,
-  onQuickSelect,
+  onClearSelection,
   outputFileName,
   setOutputFileName,
   isRunning,
@@ -326,7 +326,7 @@ function RemoveRightPanel({
   readonly deletedCount: number;
   readonly rangeInput: string;
   readonly onRangeInputChange: (val: string) => void;
-  readonly onQuickSelect: (action: "odd" | "even" | "all" | "clear" | "invert") => void;
+  readonly onClearSelection: () => void;
   readonly outputFileName: string;
   readonly setOutputFileName: (val: string) => void;
   readonly isRunning: boolean;
@@ -412,37 +412,27 @@ function RemoveRightPanel({
           Enter individual pages or ranges separated by commas (e.g. 1, 3-5).
         </p>
 
-        {/* Quick select buttons */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginTop: "0.65rem" }}>
-          <button
-            type="button"
-            onClick={() => onQuickSelect("odd")}
-            style={{ fontSize: "0.75rem", fontWeight: 700, padding: "0.25rem 0.5rem", borderRadius: "4px", border: "1px solid var(--border-light)", background: "#ffffff", color: "var(--text-secondary)", cursor: "pointer" }}
-          >
-            Odd Pages
-          </button>
-          <button
-            type="button"
-            onClick={() => onQuickSelect("even")}
-            style={{ fontSize: "0.75rem", fontWeight: 700, padding: "0.25rem 0.5rem", borderRadius: "4px", border: "1px solid var(--border-light)", background: "#ffffff", color: "var(--text-secondary)", cursor: "pointer" }}
-          >
-            Even Pages
-          </button>
-          <button
-            type="button"
-            onClick={() => onQuickSelect("invert")}
-            style={{ fontSize: "0.75rem", fontWeight: 700, padding: "0.25rem 0.5rem", borderRadius: "4px", border: "1px solid var(--border-light)", background: "#ffffff", color: "var(--text-secondary)", cursor: "pointer" }}
-          >
-            Invert
-          </button>
-          <button
-            type="button"
-            onClick={() => onQuickSelect("clear")}
-            style={{ fontSize: "0.75rem", fontWeight: 700, padding: "0.25rem 0.5rem", borderRadius: "4px", border: "1px solid var(--border-light)", background: "#ffffff", color: "#dc2626", cursor: "pointer" }}
-          >
-            Clear Selection
-          </button>
-        </div>
+        {/* Quick action button */}
+        {deletedCount > 0 && (
+          <div style={{ marginTop: "0.65rem" }}>
+            <button
+              type="button"
+              onClick={onClearSelection}
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                padding: "0.25rem 0.5rem",
+                borderRadius: "4px",
+                border: "1px solid var(--border-light)",
+                background: "#ffffff",
+                color: "#dc2626",
+                cursor: "pointer",
+              }}
+            >
+              Clear Selection
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Output file name */}
@@ -492,24 +482,12 @@ function RemoveRightPanel({
               boxShadow: canDelete ? "0 4px 14px rgba(220, 38, 38, 0.35)" : "none",
             }}
           >
-            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-            <span>
-              {deletedCount === 0
-                ? "Select Pages to Delete"
-                : remainingCount === 0
-                ? "Cannot Remove All Pages"
-                : `Delete ${deletedCount} ${deletedCount === 1 ? "Page" : "Pages"}`}
-            </span>
+            <span>Remove Pages</span>
           </button>
 
-          {!canDelete && (
-            <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", textAlign: "center", margin: "0.5rem 0 0 0" }}>
-              {remainingCount === 0
-                ? "At least 1 page must remain in the document."
-                : "Click on pages or type numbers above to mark for deletion."}
+          {!canDelete && remainingCount === 0 && deletedCount > 0 && (
+            <p style={{ fontSize: "0.75rem", color: "#dc2626", textAlign: "center", margin: "0.5rem 0 0 0" }}>
+              At least 1 page must remain in the document.
             </p>
           )}
         </div>
@@ -636,36 +614,12 @@ export default function RemoveTool() {
     [numPages]
   );
 
-  /* ── Quick Selection Actions ─────────────────────────────── */
-  const handleQuickSelect = useCallback(
-    (action: "odd" | "even" | "all" | "clear" | "invert") => {
-      if (!numPages) return;
-      const next = new Set<number>();
-
-      if (action === "odd") {
-        for (let i = 0; i < numPages; i++) {
-          if (i % 2 === 0) next.add(i); // Page 1, 3, 5... (0-based 0, 2, 4...)
-        }
-      } else if (action === "even") {
-        for (let i = 0; i < numPages; i++) {
-          if (i % 2 === 1) next.add(i); // Page 2, 4, 6... (0-based 1, 3, 5...)
-        }
-      } else if (action === "all") {
-        for (let i = 0; i < numPages; i++) next.add(i);
-      } else if (action === "invert") {
-        for (let i = 0; i < numPages; i++) {
-          if (!deletedPages.has(i)) next.add(i);
-        }
-      } else if (action === "clear") {
-        // empty set
-      }
-
-      setDeletedPages(next);
-      setRangeInput(formatPagesToRangeString(Array.from(next)));
-      setError("");
-    },
-    [numPages, deletedPages]
-  );
+  /* ── Selection Action ────────────────────────────────────── */
+  const handleClearSelection = useCallback(() => {
+    setDeletedPages(new Set());
+    setRangeInput("");
+    setError("");
+  }, []);
 
   /* ── Run Tool Execution ──────────────────────────────────── */
   async function handleRemoveSubmit() {
@@ -756,7 +710,7 @@ export default function RemoveTool() {
             <ToolPanelHeader
               title={`Pages in Document (${numPages})`}
               description="Click any page to mark for deletion. Click again to restore."
-              clearLabel="Clear the selected PDF"
+              clearLabel="Remove PDF"
               onClear={clearAllFiles}
             />
 
@@ -782,7 +736,7 @@ export default function RemoveTool() {
             deletedCount={deletedPages.size}
             rangeInput={rangeInput}
             onRangeInputChange={handleRangeInputChange}
-            onQuickSelect={handleQuickSelect}
+            onClearSelection={handleClearSelection}
             outputFileName={outputFileName}
             setOutputFileName={setOutputFileName}
             isRunning={isRunning}
