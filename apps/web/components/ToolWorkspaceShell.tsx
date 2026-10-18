@@ -9,6 +9,7 @@ export interface ToolWorkspaceShellProps {
   readonly error?: string;
   readonly fileInputRef: RefObject<HTMLInputElement | null>;
   readonly onFilesSelected: (files: FileList | null, append: boolean) => void;
+  readonly allowMultiple?: boolean;
   readonly children?: ReactNode;
 }
 
@@ -18,6 +19,7 @@ export default function ToolWorkspaceShell({
   error,
   fileInputRef,
   onFilesSelected,
+  allowMultiple = true,
   children,
 }: ToolWorkspaceShellProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -40,10 +42,10 @@ export default function ToolWorkspaceShell({
       e.stopPropagation();
       setIsDragging(false);
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        onFilesSelected(e.dataTransfer.files, filesCount > 0);
+        onFilesSelected(e.dataTransfer.files, allowMultiple ? filesCount > 0 : false);
       }
     },
-    [filesCount, onFilesSelected]
+    [allowMultiple, filesCount, onFilesSelected]
   );
 
   if (filesCount === 0) {
@@ -53,7 +55,7 @@ export default function ToolWorkspaceShell({
           ref={fileInputRef}
           type="file"
           hidden
-          multiple
+          multiple={allowMultiple}
           accept="application/pdf"
           onChange={(e) => {
             onFilesSelected(e.target.files, false);
@@ -67,6 +69,8 @@ export default function ToolWorkspaceShell({
           onDragLeave={onDragLeave}
           onDrop={onDrop}
           onClick={() => fileInputRef.current?.click()}
+          primaryText={allowMultiple ? "Choose PDF files, or drag and drop here" : "Choose a PDF file, or drag and drop here"}
+          badgeText={allowMultiple ? "Multiple files (.pdf)" : "Single PDF file (.pdf)"}
         />
 
         {error && (
@@ -93,23 +97,25 @@ export default function ToolWorkspaceShell({
         ref={fileInputRef}
         type="file"
         hidden
-        multiple
+        multiple={allowMultiple}
         accept="application/pdf"
         onChange={(e) => {
-          onFilesSelected(e.target.files, true);
+          onFilesSelected(e.target.files, allowMultiple);
           e.target.value = "";
         }}
       />
 
-      <PdfDropzone
-        isCompact
-        isDragging={isDragging}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-        onClick={() => fileInputRef.current?.click()}
-        badgeText={`${filesCount} ${filesCount === 1 ? "PDF" : "PDFs"} selected (${totalPages} pages total)`}
-      />
+      {allowMultiple && (
+        <PdfDropzone
+          isCompact
+          isDragging={isDragging}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+          onClick={() => fileInputRef.current?.click()}
+          badgeText={`${filesCount} ${filesCount === 1 ? "PDF" : "PDFs"} selected (${totalPages} pages total)`}
+        />
+      )}
 
       {children}
     </div>

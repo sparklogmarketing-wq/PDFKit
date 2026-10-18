@@ -775,6 +775,7 @@ export default function RemoveTool() {
       fileInputRef={fileInputRef}
       filesCount={file ? 1 : 0}
       totalPages={numPages}
+      allowMultiple={false}
       onFilesSelected={handleFileSelect}
     >
       {file && (
@@ -784,6 +785,7 @@ export default function RemoveTool() {
             <ToolPanelHeader
               title={`Pages in Document (${numPages})`}
               description="Click any page or trash icon to mark for deletion. Click again to restore."
+              clearLabel="Change PDF"
               onClear={clearAllFiles}
             />
 
