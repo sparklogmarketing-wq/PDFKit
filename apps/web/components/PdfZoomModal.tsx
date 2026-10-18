@@ -10,6 +10,9 @@ interface PdfZoomModalProps {
   readonly angle?: number;
   readonly showAngle?: boolean;
   readonly isProtected?: boolean;
+  readonly statusBadgeText?: string;
+  readonly statusBadgeVariant?: "warning" | "danger" | "success" | "default";
+  readonly extraAction?: React.ReactNode;
   readonly onRotateLeft?: () => void;
   readonly onRotateRight?: () => void;
   readonly onClose: () => void;
@@ -22,6 +25,9 @@ export default function PdfZoomModal({
   angle,
   showAngle,
   isProtected = false,
+  statusBadgeText,
+  statusBadgeVariant = "default",
+  extraAction,
   onRotateLeft,
   onRotateRight,
   onClose,
@@ -139,9 +145,49 @@ export default function PdfZoomModal({
             >
               Page {displayNum} {isProtected ? "(Kept Original)" : ""}
             </span>
+
+            {statusBadgeText && (
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  padding: "0.15rem 0.55rem",
+                  borderRadius: "9999px",
+                  background:
+                    statusBadgeVariant === "danger"
+                      ? "#fee2e2"
+                      : statusBadgeVariant === "warning"
+                      ? "#fef3c7"
+                      : statusBadgeVariant === "success"
+                      ? "#d1fae5"
+                      : "var(--bg-muted)",
+                  color:
+                    statusBadgeVariant === "danger"
+                      ? "#b91c1c"
+                      : statusBadgeVariant === "warning"
+                      ? "#92400e"
+                      : statusBadgeVariant === "success"
+                      ? "#065f46"
+                      : "var(--text-secondary)",
+                  border: `1px solid ${
+                    statusBadgeVariant === "danger"
+                      ? "#fca5a5"
+                      : statusBadgeVariant === "warning"
+                      ? "#fde68a"
+                      : statusBadgeVariant === "success"
+                      ? "#a7f3d0"
+                      : "var(--border-light)"
+                  }`,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}
+              >
+                {statusBadgeText}
+              </span>
+            )}
           </div>
 
           <div className="pdf-modal-actions" style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
+            {extraAction}
             {onRotateLeft && onRotateRight && !isProtected && (
               <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
                 <button
