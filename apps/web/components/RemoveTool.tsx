@@ -181,17 +181,40 @@ function FinalDeleteConfirmModal({
 }) {
   const remainingCount = totalCount - deleteCount;
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onCancel();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel]);
+
   return (
-    <div
-      className="confirm-modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-modal-title"
-      onClick={onCancel}
-    >
+    <div className="confirm-modal-backdrop">
+      <button
+        type="button"
+        aria-label="Close dialog"
+        onClick={onCancel}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          margin: 0,
+          cursor: "default",
+        }}
+      />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
         className="confirm-modal-box"
-        onClick={(e) => e.stopPropagation()}
+        style={{ position: "relative", zIndex: 1 }}
       >
         {/* Modal Header */}
         <div className="confirm-modal-header">
