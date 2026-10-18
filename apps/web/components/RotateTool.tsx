@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { renderPdfPage, loadPdfPagesMap } from "../lib/pdfjs";
 import { runTool } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import PdfZoomModal from "./PdfZoomModal";
 import ToolResultsView from "./ToolResultsView";
-import PdfDropzone from "./PdfDropzone";
 import ToolProgressBar from "./ToolProgressBar";
+import ToolWorkspaceShell from "./ToolWorkspaceShell";
+import ToolPanelHeader from "./ToolPanelHeader";
 import type { OutputFile } from "@pdfkit/core";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -653,20 +654,7 @@ function RotateFooter({
         <button
           type="button"
           onClick={onRotateSubmit}
-          className="btn-primary"
-          style={{
-            width: "100%",
-            padding: "0.875rem 1rem",
-            fontSize: "1.0625rem",
-            fontWeight: 800,
-            borderRadius: "var(--radius-md)",
-            boxShadow: "var(--shadow-md)",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.5rem",
-          }}
+          className="btn-primary tool-action-btn"
         >
           <span>{filesCount > 1 ? `Rotate ${filesCount} PDFs` : "Rotate PDF"}</span>
         </button>
@@ -850,7 +838,6 @@ export default function RotateTool() {
   /* Files State */
   const [files, setFiles] = useState<File[]>([]);
   const [filePagesMap, setFilePagesMap] = useState<Record<string, number>>({});
-  const [isDragging, setIsDragging] = useState(false);
 
   /* Per-page angle map: key = "filename-pageNum", value = cumulative angle degrees */
   const [pageAngles, setPageAngles] = useState<Record<string, number>>({});
@@ -947,21 +934,13 @@ export default function RotateTool() {
 
     setFiles(updatedFiles);
 
-    // Fetch page counts for all files in parallel
-    const missingFiles = arr.filter((f) => !filePagesMap[f.name]);
-    if (missingFiles.length > 0) {
-      const infos = await Promise.all(missingFiles.map((f) => getPdfInfo(f)));
-      const newPagesMap = { ...filePagesMap };
-      missingFiles.forEach((f, idx) => {
-        newPagesMap[f.name] = infos[idx]?.numPages ?? 1;
-      });
-      setFilePagesMap(newPagesMap);
+    const newPagesMap = await loadPdfPagesMap(arr, filePagesMap);
+    setFilePagesMap(newPagesMap);
 
-      const highestPage = Object.values(newPagesMap).reduce((m, c) => Math.max(m, c), 1);
-      if (!rangeEnabled) {
-        setRangeFrom(1);
-        setRangeTo(Math.min(highestPage, 2));
-      }
+    const highestPage = Object.values(newPagesMap).reduce((m, c) => Math.max(m, c), 1);
+    if (!rangeEnabled) {
+      setRangeFrom(1);
+      setRangeTo(Math.min(highestPage, 2));
     }
   }
 
@@ -1103,31 +1082,6 @@ export default function RotateTool() {
     }
   }
 
-  /* ── Drag & Drop Handlers ────────────────────────────────── */
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        void handleFileSelect(e.dataTransfer.files, files.length > 0);
-      }
-    },
-    [files.length]
-  );
-
-  const onDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
-
-  const onDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
   /* ── RENDER: Results View ────────────────────────────────── */
   if (results.length > 0) {
     return (
@@ -1147,90 +1101,25 @@ export default function RotateTool() {
     );
   }
 
-  /* ── RENDER: Initial Empty State (Dropzone) ──────────────── */
-  if (files.length === 0) {
-    return (
-      <div className="tool-runner-panel" style={{ maxWidth: 860, margin: "0 auto" }}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          hidden
-          multiple
-          accept="application/pdf"
-          onChange={(e) => {
-            void handleFileSelect(e.target.files, false);
-            e.target.value = "";
-          }}
-        />
-
-        <PdfDropzone
-          isDragging={isDragging}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-          onClick={() => fileInputRef.current?.click()}
-        />
-
-        {error && (
-          <div className="alert-error" style={{ marginTop: "1rem" }}>
-            {error}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  /* ── RENDER: Active Workspace (All PDFs together) ───────────── */
+  /* ── RENDER: Document Rotation Studio ──────────────────────── */
   return (
-    <div style={{ width: "100%", maxWidth: "100%", margin: "0 auto", paddingBottom: "3rem", overflowX: "clip", boxSizing: "border-box" }}>
-      <input
-        ref={fileInputRef}
-        type="file"
-        hidden
-        multiple
-        accept="application/pdf"
-        onChange={(e) => {
-          void handleFileSelect(e.target.files, true);
-          e.target.value = "";
-        }}
-      />
-
-      {/* Top Upload Banner */}
-      <PdfDropzone
-        isCompact
-        isDragging={isDragging}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-        onClick={() => fileInputRef.current?.click()}
-        badgeText={`${files.length} ${files.length === 1 ? "PDF" : "PDFs"} selected (${totalPagesAllFiles} pages total)`}
-      />
-
+    <ToolWorkspaceShell
+      error={error}
+      fileInputRef={fileInputRef}
+      filesCount={files.length}
+      totalPages={totalPagesAllFiles}
+      onFilesSelected={handleFileSelect}
+    >
       {/* 2-Column Interface: Left = All Pages Preview, Right = 3 Tabs Control Panel */}
       <div className="rotate-workspace-layout">
         {/* LEFT PANEL: Preview of all pages of all selected PDFs */}
         <div className="tool-left-panel">
           {/* Header */}
-          <div className="tool-panel-header">
-            <div>
-              <h2 style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--text-main)", margin: 0 }}>
-                Pages Preview
-              </h2>
-              <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0.2rem 0 0 0" }}>
-                All pages of all selected PDFs are shown vertically. Use the right panel or card buttons to rotate.
-              </p>
-            </div>
-
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              <button
-                type="button"
-                onClick={clearAllFiles}
-                className="tool-clear-btn"
-              >
-                Clear All
-              </button>
-            </div>
-          </div>
+          <ToolPanelHeader
+            title="Pages Preview"
+            description="All pages of all selected PDFs are shown vertically. Use the right panel or card buttons to rotate."
+            onClear={clearAllFiles}
+          />
 
           {/* Unified list of all documents and their pages */}
           <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
@@ -1410,6 +1299,6 @@ export default function RotateTool() {
           />
         );
       })()}
-    </div>
+    </ToolWorkspaceShell>
   );
 }

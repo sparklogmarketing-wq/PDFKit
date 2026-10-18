@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { getPdfInfo } from "../lib/pdfjs";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { loadPdfPagesMap } from "../lib/pdfjs";
 import { runTool } from "../lib/runTool";
+import { calculateTotalPages, filterPdfFiles, appendUniqueFiles } from "../lib/format";
 import PdfZoomModal from "./PdfZoomModal";
 import PdfThumbnailCard from "./PdfThumbnailCard";
 import ToolResultsView from "./ToolResultsView";
-import PdfDropzone from "./PdfDropzone";
 import ToolProgressBar from "./ToolProgressBar";
+import ToolWorkspaceShell from "./ToolWorkspaceShell";
+import ToolPanelHeader from "./ToolPanelHeader";
 import type { OutputFile } from "@pdfkit/core";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -331,31 +333,17 @@ function MergeRightPanel({
             type="button"
             disabled={!canMerge}
             onClick={onMergeSubmit}
-            className="btn-primary"
-            style={{
-              width: "100%",
-              padding: "0.875rem 1rem",
-              fontSize: "1.0625rem",
-              fontWeight: 800,
-              borderRadius: "var(--radius-md)",
-              boxShadow: canMerge ? "var(--shadow-md)" : "none",
-              cursor: canMerge ? "pointer" : "not-allowed",
-              opacity: canMerge ? 1 : 0.6,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.5rem",
-            }}
+            className="btn-primary tool-action-btn"
           >
             <span>Merge PDFs</span>
           </button>
         )}
 
-        {error && (
-          <div className="alert-error" style={{ marginTop: "1rem" }}>
-            {error}
+        {error ? (
+          <div className="alert-error" role="alert" style={{ marginTop: "1rem" }}>
+            <span>{error}</span>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -368,7 +356,6 @@ export default function MergeTool() {
   /* Files State */
   const [files, setFiles] = useState<File[]>([]);
   const [filePagesMap, setFilePagesMap] = useState<Record<string, number>>({});
-  const [isDragging, setIsDragging] = useState(false);
   const [outputFileName, setOutputFileName] = useState("merged.pdf");
 
   /* Drag & Drop Reorder states */
@@ -392,21 +379,20 @@ export default function MergeTool() {
   /* Cleanup object URLs on unmount */
   useEffect(() => {
     return () => {
-      results.forEach((r) => URL.revokeObjectURL(r.url));
+      results.forEach((res) => URL.revokeObjectURL(res.url));
     };
   }, [results]);
 
   /* Total pages across all loaded files */
-  const totalPagesAllFiles = useMemo(() => {
-    return files.reduce((acc, f) => acc + (filePagesMap[f.name] || 0), 0);
-  }, [files, filePagesMap]);
+  const totalPagesAllFiles = useMemo(
+    () => calculateTotalPages(files, filePagesMap),
+    [files, filePagesMap]
+  );
 
   /* ── Load Files ──────────────────────────────────────────── */
   async function handleFileSelect(selectedFiles: FileList | File[] | null, append = true) {
-    if (!selectedFiles || selectedFiles.length === 0) return;
-    const arr = Array.from(selectedFiles).filter((f) => f.name.toLowerCase().endsWith(".pdf"));
-
-    if (arr.length === 0) {
+    const pdfs = filterPdfFiles(selectedFiles);
+    if (pdfs.length === 0) {
       setError("Please select valid PDF files.");
       return;
     }
@@ -415,22 +401,11 @@ export default function MergeTool() {
     setResults([]);
     setProgress(null);
 
-    const updatedFiles = append
-      ? [...files, ...arr.filter((af) => !files.some((ef) => ef.name === af.name))]
-      : arr;
+    const updated = append ? appendUniqueFiles(files, pdfs) : pdfs;
+    setFiles(updated);
 
-    setFiles(updatedFiles);
-
-    // Fetch page counts for all files in parallel
-    const missingFiles = arr.filter((f) => !filePagesMap[f.name]);
-    if (missingFiles.length > 0) {
-      const infos = await Promise.all(missingFiles.map((f) => getPdfInfo(f)));
-      const newPagesMap = { ...filePagesMap };
-      missingFiles.forEach((f, idx) => {
-        newPagesMap[f.name] = infos[idx]?.numPages ?? 1;
-      });
-      setFilePagesMap(newPagesMap);
-    }
+    const newPages = await loadPdfPagesMap(pdfs, filePagesMap);
+    setFilePagesMap(newPages);
   }
 
   function removeFile(index: number) {
@@ -587,31 +562,6 @@ export default function MergeTool() {
     }
   }
 
-  /* ── Dropzone Handlers ───────────────────────────────────── */
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        void handleFileSelect(e.dataTransfer.files, files.length > 0);
-      }
-    },
-    [files.length]
-  );
-
-  const onDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
-
-  const onDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
   /* ── RENDER: Results View ────────────────────────────────── */
   if (results.length > 0) {
     return (
@@ -625,90 +575,27 @@ export default function MergeTool() {
     );
   }
 
-  /* ── RENDER: Initial Empty State ─────────────────────────── */
-  if (files.length === 0) {
-    return (
-      <div className="tool-runner-panel" style={{ maxWidth: 860, margin: "0 auto" }}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          hidden
-          multiple
-          accept="application/pdf"
-          onChange={(e) => {
-            void handleFileSelect(e.target.files, false);
-            e.target.value = "";
-          }}
-        />
-
-        <PdfDropzone
-          isDragging={isDragging}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-          onClick={() => fileInputRef.current?.click()}
-        />
-
-        {error && (
-          <div className="alert-error" style={{ marginTop: "1rem" }}>
-            {error}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   /* ── RENDER: Active 2-Column Workspace ───────────────────── */
   return (
-    <div style={{ width: "100%", maxWidth: "100%", margin: "0 auto", paddingBottom: "3rem", overflowX: "clip", boxSizing: "border-box" }}>
-      <input
-        ref={fileInputRef}
-        type="file"
-        hidden
-        multiple
-        accept="application/pdf"
-        onChange={(e) => {
-          void handleFileSelect(e.target.files, true);
-          e.target.value = "";
-        }}
-      />
-
-      {/* Top Upload Banner */}
-      <PdfDropzone
-        isCompact
-        isDragging={isDragging}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-        onClick={() => fileInputRef.current?.click()}
-        badgeText={`${files.length} ${files.length === 1 ? "PDF" : "PDFs"} selected (${totalPagesAllFiles} pages total)`}
-      />
-
+    <ToolWorkspaceShell
+      filesCount={files.length}
+      totalPages={totalPagesAllFiles}
+      error={error}
+      fileInputRef={fileInputRef}
+      onFilesSelected={(selected, append) => {
+        void handleFileSelect(selected, append);
+      }}
+    >
       {/* 2-Column Interface: Left = Files Preview Grid, Right = Merge Sequence & Controls */}
       <div className="merge-workspace-layout">
         {/* LEFT PANEL: Preview grid of all documents */}
         <div className="tool-left-panel">
           {/* Header */}
-          <div className="tool-panel-header">
-            <div>
-              <h2 style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--text-main)", margin: 0 }}>
-                Files to Merge ({files.length})
-              </h2>
-              <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0.2rem 0 0 0" }}>
-                Drag cards to reorder the sequence. You can also rotate or preview each document.
-              </p>
-            </div>
-
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              <button
-                type="button"
-                onClick={clearAllFiles}
-                className="tool-clear-btn"
-              >
-                Clear All
-              </button>
-            </div>
-          </div>
+          <ToolPanelHeader
+            title={`Files to Merge (${files.length})`}
+            description="Drag cards to reorder the sequence. You can also rotate or preview each document."
+            onClear={clearAllFiles}
+          />
 
           {/* Cards Grid */}
           <div className="pdf-thumbs-grid">
@@ -768,6 +655,6 @@ export default function MergeTool() {
           onClose={() => setZoomTarget(null)}
         />
       )}
-    </div>
+    </ToolWorkspaceShell>
   );
 }

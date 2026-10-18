@@ -2094,4 +2094,31 @@ a {
   min-width: 0;
   box-sizing: border-box;
   z-index: 10;
+}
+
+.tool-action-btn {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  font-size: 1.0625rem;
+  font-weight: 800;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all var(--transition-fast);
+}
+
+.tool-action-btn:not(:disabled) {
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+}
+
+.tool-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
 }
