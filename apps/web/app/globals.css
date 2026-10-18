@@ -2009,9 +2009,9 @@ a {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 1px solid #fecaca;
+  border: 1px solid var(--primary-border, #ddd6fe);
   background: #ffffff;
-  color: #ef4444;
+  color: var(--primary, #7c3aed);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2021,8 +2021,9 @@ a {
 }
 
 .split-page-zoom-btn:hover {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--primary-subtle, #f5f3ff);
+  color: var(--primary-dark, #6d28d9);
+  border-color: var(--primary, #7c3aed);
   transform: scale(1.1);
 }
 
