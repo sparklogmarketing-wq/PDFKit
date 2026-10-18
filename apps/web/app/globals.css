@@ -2056,6 +2056,116 @@ a {
   background: #d1fae5;
 }
 
+/* ── Extract Pages Tool Styles ── */
+.extract-pages-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(82px, 92px));
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+}
+
+.extract-page-thumb {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid var(--border-light);
+  border-radius: 8px;
+  padding: 0.35rem 0.35rem 0.45rem;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  width: 100%;
+}
+
+.extract-page-thumb:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.12);
+  border-color: var(--primary-border, #ddd6fe);
+}
+
+.extract-page-thumb.selected {
+  border-color: var(--primary);
+  background: var(--primary-subtle);
+  box-shadow: 0 0 0 1.5px var(--primary), 0 4px 12px rgba(124, 58, 237, 0.18);
+}
+
+.extract-page-thumb-top {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+  padding: 0 0.05rem;
+}
+
+.extract-page-check {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.extract-page-check.checked {
+  background: var(--primary);
+  border-color: var(--primary-dark);
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(124, 58, 237, 0.35);
+}
+
+.extract-page-sheet {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1.35;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.extract-page-num-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #374151;
+  background: #f3f4f6;
+  border-radius: 99px;
+  padding: 0.05rem 0.45rem;
+  margin-top: 0.3rem;
+  line-height: 1.3;
+}
+
+.extract-page-thumb.selected .extract-page-num-badge {
+  color: var(--primary-dark);
+  background: var(--primary-border);
+}
+
+.extract-quick-btn {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--primary-border, #ddd6fe);
+  background: #ffffff;
+  color: var(--primary, #7c3aed);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.extract-quick-btn:hover {
+  background: var(--primary, #7c3aed);
+  color: #ffffff;
+}
+
 /* ── Size Mode Unit Toggle ── */
 .size-unit-toggle {
   display: inline-flex;

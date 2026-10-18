@@ -6,6 +6,7 @@ import mergeMod from "../packages/mod-merge/src/index.ts";
 import splitMod from "../packages/mod-split/src/index.ts";
 import rotateMod from "../packages/mod-rotate/src/index.ts";
 import organizeMod from "../packages/mod-organize/src/index.ts";
+import extractMod from "../packages/mod-extract/src/index.ts";
 
 async function createSamplePdf(pages = 3) {
   const doc = await PDFDocument.create();
@@ -249,5 +250,84 @@ test("mod-organize", async (t) => {
         { name: "docA.pdf", data: pdfA },
       ], { pages: [] }, ctx);
     }, /No pages remaining/);
+  });
+});
+
+test("mod-extract", async (t) => {
+  const samplePdf = await createSamplePdf(6); // 6 pages (0 to 5)
+  const ctx = { signal: new AbortController().signal, onProgress: () => {} };
+
+  await t.test("extracts specific page ranges merged into one PDF", async () => {
+    const results = await extractMod.run(
+      [{ name: "my-doc.pdf", data: samplePdf }],
+      { mode: "select", pages: "1-2, 5", mergeAll: true },
+      ctx
+    );
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "my-doc-extracted.pdf");
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 3);
+  });
+
+  await t.test("extracts pages as separate individual PDFs", async () => {
+    const results = await extractMod.run(
+      [{ name: "my-doc.pdf", data: samplePdf }],
+      { mode: "select", pages: "2, 4", mergeAll: false },
+      ctx
+    );
+
+    assert.equal(results.length, 2);
+    assert.equal(results[0].name, "my-doc-page2.pdf");
+    assert.equal(results[1].name, "my-doc-page4.pdf");
+    const doc1 = await PDFDocument.load(results[0].data);
+    assert.equal(doc1.getPageCount(), 1);
+    const doc2 = await PDFDocument.load(results[1].data);
+    assert.equal(doc2.getPageCount(), 1);
+  });
+
+  await t.test("extracts all pages when mode is all", async () => {
+    const results = await extractMod.run(
+      [{ name: "my-doc.pdf", data: samplePdf }],
+      { mode: "all", mergeAll: false },
+      ctx
+    );
+
+    assert.equal(results.length, 6);
+    assert.equal(results[0].name, "my-doc-page1.pdf");
+    assert.equal(results[5].name, "my-doc-page6.pdf");
+  });
+
+  await t.test("supports custom outputName for merged extraction", async () => {
+    const results = await extractMod.run(
+      [{ name: "doc.pdf", data: samplePdf }],
+      { mode: "select", pages: "1, 3", mergeAll: true, outputName: "custom-extracted" },
+      ctx
+    );
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "custom-extracted.pdf");
+  });
+
+  await t.test("supports page numbers array", async () => {
+    const results = await extractMod.run(
+      [{ name: "doc.pdf", data: samplePdf }],
+      { mode: "select", pages: [0, 2, 4], mergeAll: true },
+      ctx
+    );
+
+    assert.equal(results.length, 1);
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 3);
+  });
+
+  await t.test("throws error when no pages are selected", async () => {
+    await assert.rejects(async () => {
+      await extractMod.run(
+        [{ name: "doc.pdf", data: samplePdf }],
+        { mode: "select", pages: "" },
+        ctx
+      );
+    }, /No pages selected/);
   });
 });

@@ -4,6 +4,7 @@ import ToolRunner from "../../../components/ToolRunner";
 import SplitTool from "../../../components/SplitTool";
 import RotateTool from "../../../components/RotateTool";
 import OrganizeTool from "../../../components/OrganizeTool";
+import ExtractTool from "../../../components/ExtractTool";
 import { ToolIcon } from "../../../components/ToolIcon";
 import { manifests } from "../../../lib/registry";
 
@@ -33,6 +34,8 @@ export default async function ToolPage({ params }: { readonly params: Promise<{ 
     toolComponent = <RotateTool />;
   } else if (id === "organize") {
     toolComponent = <OrganizeTool />;
+  } else if (id === "extract") {
+    toolComponent = <ExtractTool />;
   } else {
     toolComponent = <ToolRunner manifest={manifest} />;
   }

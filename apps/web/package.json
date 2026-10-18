@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@pdfkit/core": "*",
+    "@pdfkit/mod-extract": "*",
     "@pdfkit/mod-merge": "*",
     "@pdfkit/mod-organize": "*",
     "@pdfkit/mod-rotate": "*",
