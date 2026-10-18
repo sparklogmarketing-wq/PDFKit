@@ -113,35 +113,6 @@ function RemovePageThumbnailCard({
               <line x1="8" y1="11" x2="14" y2="11"></line>
             </svg>
           </button>
-
-          {/* Delete Toggle Button */}
-          <button
-            type="button"
-            title={isDeleted ? "Restore this page" : "Mark page for deletion"}
-            aria-label={isDeleted ? `Restore page ${pageNum}` : `Delete page ${pageNum}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleDelete(pageNum);
-            }}
-            style={{
-              width: "26px",
-              height: "26px",
-              borderRadius: "50%",
-              border: `1.5px solid ${isDeleted ? "#ef4444" : "var(--border-light)"}`,
-              background: isDeleted ? "#ef4444" : "#ffffff",
-              color: isDeleted ? "#ffffff" : "var(--danger)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          </button>
         </div>
       </div>
 
@@ -784,8 +755,8 @@ export default function RemoveTool() {
           <div className="tool-left-panel">
             <ToolPanelHeader
               title={`Pages in Document (${numPages})`}
-              description="Click any page or trash icon to mark for deletion. Click again to restore."
-              clearLabel="Change PDF"
+              description="Click any page to mark for deletion. Click again to restore."
+              clearLabel="Clear the selected PDF"
               onClear={clearAllFiles}
             />
 
