@@ -153,8 +153,8 @@ const mod: ToolModule<RotateOptions> = {
 
     const defaultDelta = parseDegrees(opts.degrees ?? opts.direction, 90);
     const results = await Promise.all(
-      inputs.map((input, fIdx) =>
-        processPdfFile(input, fIdx, inputs.length, opts, defaultDelta, ctx)
+      inputs.map((file, fIdx) =>
+        processPdfFile(file, fIdx, inputs.length, opts, defaultDelta, ctx)
       )
     );
 

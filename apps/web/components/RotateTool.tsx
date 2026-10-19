@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { renderPdfPage, loadPdfPagesMap } from "../lib/pdfjs";
 import { runTool } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
+import { formatBytes } from "../lib/formatBytes";
 import PdfZoomModal from "./PdfZoomModal";
 import ToolResultsView from "./ToolResultsView";
 import ToolProgressBar from "./ToolProgressBar";
@@ -669,6 +670,7 @@ function RotateFooter({
   );
 }
 
+/* ── Right Panel: Tabs Component ─────────────────────────────── */
 function RotateRightPanel({
   filesCount,
   totalPagesAllFiles,
@@ -1286,7 +1288,6 @@ export default function RotateTool() {
           <PdfZoomModal
             file={zoomTarget.file}
             pageNum={zoomTarget.localPageNum}
-            displayPageNum={zoomTarget.displayPageNum}
             angle={angle}
             isProtected={isProtected}
             onRotateLeft={() =>

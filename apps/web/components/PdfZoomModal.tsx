@@ -8,6 +8,7 @@ interface PdfZoomModalProps {
   readonly pageNum?: number;
   readonly displayPageNum?: number;
   readonly angle?: number;
+  readonly rotation?: number;
   readonly showAngle?: boolean;
   readonly isProtected?: boolean;
   readonly statusBadgeText?: string;
@@ -22,7 +23,8 @@ export default function PdfZoomModal({
   file,
   pageNum = 1,
   displayPageNum,
-  angle,
+  angle = 0,
+  rotation = 0,
   showAngle,
   isProtected = false,
   statusBadgeText,
@@ -66,13 +68,13 @@ export default function PdfZoomModal({
 
   if (!file) return null;
 
-  const rawAngle = angle ?? 0;
+  const rawAngle = angle || rotation || 0;
   const effectiveAngle = isProtected ? 0 : rawAngle;
   const normAngle = ((effectiveAngle % 360) + 360) % 360;
   const isSideways = normAngle % 180 !== 0;
   const scaleRatio = isSideways ? 0.72 : 1;
   const displayNum = displayPageNum ?? pageNum;
-  const shouldDisplayAngle = showAngle ?? (angle !== undefined);
+  const shouldDisplayAngle = showAngle ?? (angle !== undefined || rotation !== undefined);
 
   return (
     <div className="pdf-modal-backdrop">
@@ -108,6 +110,9 @@ export default function PdfZoomModal({
           padding: 0,
           background: "#ffffff",
           color: "inherit",
+          border: "none",
+          borderRadius: "var(--radius-lg, 12px)",
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
         }}
       >
         {/* Modal Header */}
