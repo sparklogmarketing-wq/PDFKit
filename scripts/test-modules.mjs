@@ -5,6 +5,8 @@ import { parsePageSpec, ToolError } from "../packages/core/src/index.ts";
 import mergeMod from "../packages/mod-merge/src/index.ts";
 import splitMod from "../packages/mod-split/src/index.ts";
 import rotateMod from "../packages/mod-rotate/src/index.ts";
+import organizeMod from "../packages/mod-organize/src/index.ts";
+import extractMod from "../packages/mod-extract/src/index.ts";
 
 async function createSamplePdf(pages = 3) {
   const doc = await PDFDocument.create();
@@ -150,15 +152,182 @@ test("mod-rotate", async (t) => {
     assert.equal(doc.getPage(2).getRotation().angle, 0);
   });
 
-  await t.test("rotates all pages when blank", async () => {
+  await t.test("rotates left (counter-clockwise 270 degrees)", async () => {
     const results = await rotateMod.run([
       { name: "doc.pdf", data: pdf },
-    ], { degrees: "180", pages: "" }, ctx);
+    ], { degrees: "left", pages: "1" }, ctx);
 
     assert.equal(results.length, 1);
     const doc = await PDFDocument.load(results[0].data);
-    assert.equal(doc.getPage(0).getRotation().angle, 180);
+    assert.equal(doc.getPage(0).getRotation().angle, 270);
+    assert.equal(doc.getPage(1).getRotation().angle, 0);
+  });
+
+  await t.test("rotates multiple files at a time", async () => {
+    const pdf2 = await createSamplePdf(2);
+    const results = await rotateMod.run([
+      { name: "first.pdf", data: pdf },
+      { name: "second.pdf", data: pdf2 },
+    ], { degrees: "90" }, ctx);
+
+    assert.equal(results.length, 2);
+    assert.equal(results[0].name, "first-rotated.pdf");
+    assert.equal(results[1].name, "second-rotated.pdf");
+
+    const doc1 = await PDFDocument.load(results[0].data);
+    assert.equal(doc1.getPageCount(), 3);
+    assert.equal(doc1.getPage(0).getRotation().angle, 90);
+
+    const doc2 = await PDFDocument.load(results[1].data);
+    assert.equal(doc2.getPageCount(), 2);
+    assert.equal(doc2.getPage(0).getRotation().angle, 90);
+  });
+
+  await t.test("excludes specified pages from rotation", async () => {
+    // 3 pages: rotate 90 right, but exclude page 2
+    const results = await rotateMod.run([
+      { name: "doc.pdf", data: pdf },
+    ], { degrees: "90", pages: "", excludePages: "2" }, ctx);
+
+    assert.equal(results.length, 1);
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPage(0).getRotation().angle, 90);
+    assert.equal(doc.getPage(1).getRotation().angle, 0); // Excluded!
+    assert.equal(doc.getPage(2).getRotation().angle, 90);
+  });
+
+  await t.test("applies custom rotations to specific pages and ranges", async () => {
+    // 3 pages: page 1 -> 90, page 2 -> 180, page 3 -> 270
+    const results = await rotateMod.run([
+      { name: "doc.pdf", data: pdf },
+    ], {
+      degrees: "0",
+      customRotations: [
+        { pages: "1", degrees: "90" },
+        { pages: "2", degrees: "180" },
+        { pages: "3", degrees: "270" },
+      ],
+    }, ctx);
+
+    assert.equal(results.length, 1);
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPage(0).getRotation().angle, 90);
     assert.equal(doc.getPage(1).getRotation().angle, 180);
-    assert.equal(doc.getPage(2).getRotation().angle, 180);
+    assert.equal(doc.getPage(2).getRotation().angle, 270);
+  });
+});
+
+test("mod-organize", async (t) => {
+  const pdfA = await createSamplePdf(3); // 3 pages (0, 1, 2)
+  const pdfB = await createSamplePdf(2); // 2 pages (0, 1)
+  const ctx = { signal: new AbortController().signal, onProgress: () => {} };
+
+  await t.test("sorts, rotates, deletes, and adds blank pages across PDFs", async () => {
+    // Pick Page 2 from A, Page 1 from B rotated 90, a blank page, Page 0 from A
+    const pages = [
+      { fileIndex: 0, pageIndex: 2, rotation: 0 },
+      { fileIndex: 1, pageIndex: 0, rotation: 90 },
+      { isBlank: true },
+      { fileIndex: 0, pageIndex: 0, rotation: 0 },
+    ];
+
+    const results = await organizeMod.run([
+      { name: "docA.pdf", data: pdfA },
+      { name: "docB.pdf", data: pdfB },
+    ], { pages }, ctx);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "docA_organized.pdf");
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 4);
+    assert.equal(doc.getPage(0).getRotation().angle, 0);
+    assert.equal(doc.getPage(1).getRotation().angle, 90);
+  });
+
+  await t.test("throws error when no pages remain", async () => {
+    await assert.rejects(async () => {
+      await organizeMod.run([
+        { name: "docA.pdf", data: pdfA },
+      ], { pages: [] }, ctx);
+    }, /No pages remaining/);
+  });
+});
+
+test("mod-extract", async (t) => {
+  const samplePdf = await createSamplePdf(6); // 6 pages (0 to 5)
+  const ctx = { signal: new AbortController().signal, onProgress: () => {} };
+
+  await t.test("extracts specific page ranges merged into one PDF", async () => {
+    const results = await extractMod.run(
+      [{ name: "my-doc.pdf", data: samplePdf }],
+      { mode: "select", pages: "1-2, 5", mergeAll: true },
+      ctx
+    );
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "my-doc-extracted.pdf");
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 3);
+  });
+
+  await t.test("extracts pages as separate individual PDFs", async () => {
+    const results = await extractMod.run(
+      [{ name: "my-doc.pdf", data: samplePdf }],
+      { mode: "select", pages: "2, 4", mergeAll: false },
+      ctx
+    );
+
+    assert.equal(results.length, 2);
+    assert.equal(results[0].name, "my-doc-page2.pdf");
+    assert.equal(results[1].name, "my-doc-page4.pdf");
+    const doc1 = await PDFDocument.load(results[0].data);
+    assert.equal(doc1.getPageCount(), 1);
+    const doc2 = await PDFDocument.load(results[1].data);
+    assert.equal(doc2.getPageCount(), 1);
+  });
+
+  await t.test("extracts all pages when mode is all", async () => {
+    const results = await extractMod.run(
+      [{ name: "my-doc.pdf", data: samplePdf }],
+      { mode: "all", mergeAll: false },
+      ctx
+    );
+
+    assert.equal(results.length, 6);
+    assert.equal(results[0].name, "my-doc-page1.pdf");
+    assert.equal(results[5].name, "my-doc-page6.pdf");
+  });
+
+  await t.test("supports custom outputName for merged extraction", async () => {
+    const results = await extractMod.run(
+      [{ name: "doc.pdf", data: samplePdf }],
+      { mode: "select", pages: "1, 3", mergeAll: true, outputName: "custom-extracted" },
+      ctx
+    );
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "custom-extracted.pdf");
+  });
+
+  await t.test("supports page numbers array", async () => {
+    const results = await extractMod.run(
+      [{ name: "doc.pdf", data: samplePdf }],
+      { mode: "select", pages: [0, 2, 4], mergeAll: true },
+      ctx
+    );
+
+    assert.equal(results.length, 1);
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 3);
+  });
+
+  await t.test("throws error when no pages are selected", async () => {
+    await assert.rejects(async () => {
+      await extractMod.run(
+        [{ name: "doc.pdf", data: samplePdf }],
+        { mode: "select", pages: "" },
+        ctx
+      );
+    }, /No pages selected/);
   });
 });

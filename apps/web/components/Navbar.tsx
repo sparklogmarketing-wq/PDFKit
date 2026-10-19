@@ -9,6 +9,8 @@ const TOOL_LINKS = [
   { href: "/tools/merge", label: "Merge PDF" },
   { href: "/tools/split", label: "Split PDF" },
   { href: "/tools/rotate", label: "Rotate PDF" },
+  { href: "/tools/organize", label: "Organize PDF" },
+  { href: "/tools/extract", label: "Extract Pages" },
 ];
 
 function NavSearch() {
