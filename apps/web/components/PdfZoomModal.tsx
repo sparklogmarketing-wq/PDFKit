@@ -6,9 +6,14 @@ import { renderPdfPage } from "../lib/pdfjs";
 interface PdfZoomModalProps {
   readonly file: File | null;
   readonly pageNum?: number;
+  readonly displayPageNum?: number;
   readonly angle?: number;
   readonly rotation?: number;
+  readonly showAngle?: boolean;
   readonly isProtected?: boolean;
+  readonly statusBadgeText?: string;
+  readonly statusBadgeVariant?: "warning" | "danger" | "success" | "default";
+  readonly extraAction?: React.ReactNode;
   readonly onRotateLeft?: () => void;
   readonly onRotateRight?: () => void;
   readonly onClose: () => void;
@@ -17,9 +22,14 @@ interface PdfZoomModalProps {
 export default function PdfZoomModal({
   file,
   pageNum = 1,
+  displayPageNum,
   angle = 0,
   rotation = 0,
+  showAngle,
   isProtected = false,
+  statusBadgeText,
+  statusBadgeVariant = "default",
+  extraAction,
   onRotateLeft,
   onRotateRight,
   onClose,
@@ -31,8 +41,7 @@ export default function PdfZoomModal({
     if (!file || !canvasRef.current) return;
     setLoading(true);
     try {
-      // Render page at high resolution
-      await renderPdfPage(file, canvasRef.current, pageNum, 1200);
+      await renderPdfPage(file, canvasRef.current, pageNum, 1100);
     } finally {
       setLoading(false);
     }
@@ -59,161 +68,280 @@ export default function PdfZoomModal({
 
   if (!file) return null;
 
-  const effectiveAngle = isProtected ? 0 : (angle || rotation || 0);
+  const rawAngle = angle || rotation || 0;
+  const effectiveAngle = isProtected ? 0 : rawAngle;
   const normAngle = ((effectiveAngle % 360) + 360) % 360;
   const isSideways = normAngle % 180 !== 0;
   const scaleRatio = isSideways ? 0.72 : 1;
+  const displayNum = displayPageNum ?? pageNum;
+  const shouldDisplayAngle = showAngle ?? (angle !== undefined || rotation !== undefined);
 
   return (
-    <div
-      className="pdf-modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Page Preview"
-    >
+    <div className="pdf-modal-backdrop">
       <button
         type="button"
-        aria-label="Close preview background"
-        tabIndex={-1}
+        aria-label="Close preview modal"
         onClick={onClose}
         style={{
           position: "fixed",
           inset: 0,
-          width: "100%",
-          height: "100%",
           background: "transparent",
           border: "none",
-          padding: 0,
-          margin: 0,
+          width: "100%",
+          height: "100%",
           cursor: "default",
+          zIndex: 0,
         }}
       />
-      <div
-        className="pdf-zoom-clean-wrapper"
-        style={{ position: "relative", zIndex: 1 }}
+      <dialog
+        open
+        className="pdf-modal-container"
+        aria-label={`Preview of ${file.name} - Page ${displayNum}`}
+        style={{
+          width: "92vw",
+          maxWidth: "960px",
+          height: "92vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          position: "relative",
+          zIndex: 1,
+          margin: "auto",
+          padding: 0,
+          background: "#ffffff",
+          color: "inherit",
+          border: "none",
+          borderRadius: "var(--radius-lg, 12px)",
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
+        }}
       >
-        {/* Floating Close Button */}
-        <button
-          type="button"
-          className="pdf-zoom-close-btn"
-          onClick={onClose}
-          title="Close preview (Esc)"
-          aria-label="Close"
-        >
-          <svg
-            aria-hidden="true"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-
-        {/* Floating Rotate controls if opened from rotate tool */}
-        {onRotateLeft && onRotateRight && !isProtected && (
-          <div
-            style={{
-              position: "absolute",
-              top: "-52px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              background: "rgba(255, 255, 255, 0.95)",
-              backdropFilter: "blur(6px)",
-              padding: "0.35rem 0.85rem",
-              borderRadius: "9999px",
-              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
-              zIndex: 30,
-            }}
-          >
-            <button
-              type="button"
-              onClick={onRotateLeft}
-              title="Rotate Left (90° CCW)"
-              aria-label="Rotate page left 90 degrees"
-              style={{
-                border: "none",
-                background: "transparent",
-                color: "var(--primary)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.3rem",
-                fontWeight: 700,
-                fontSize: "0.8125rem",
-              }}
+        {/* Modal Header */}
+        <div className="pdf-modal-header" style={{ flexShrink: 0, padding: "0.75rem 1.25rem" }}>
+          <div className="pdf-modal-fileinfo" style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0 }}>
+            <svg
+              className="pdf-modal-icon"
+              aria-hidden="true"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="1 4 1 10 7 10" />
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-              </svg>
-              <span>Rotate Left</span>
-            </button>
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            <span className="pdf-modal-filename" title={file.name}>
+              {file.name}
+            </span>
             <span
               style={{
-                fontSize: "0.8125rem",
-                fontWeight: 800,
-                color: normAngle !== 0 ? "var(--primary)" : "var(--text-muted)",
-                padding: "0 0.35rem",
-                minWidth: "36px",
-                textAlign: "center",
+                fontSize: "0.75rem",
+                padding: "0.15rem 0.55rem",
+                borderRadius: "9999px",
+                background: isProtected ? "#fef3c7" : "var(--primary-subtle)",
+                color: isProtected ? "#92400e" : "var(--primary)",
+                border: `1px solid ${isProtected ? "#fde68a" : "var(--primary-border)"}`,
+                fontWeight: 700,
+                flexShrink: 0,
               }}
             >
-              {normAngle}°
+              Page {displayNum} {isProtected ? "(Kept Original)" : ""}
             </span>
+
+            {statusBadgeText && (
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  padding: "0.15rem 0.55rem",
+                  borderRadius: "9999px",
+                  background:
+                    statusBadgeVariant === "danger"
+                      ? "#fee2e2"
+                      : statusBadgeVariant === "warning"
+                      ? "#fef3c7"
+                      : statusBadgeVariant === "success"
+                      ? "#d1fae5"
+                      : "var(--bg-muted)",
+                  color:
+                    statusBadgeVariant === "danger"
+                      ? "#b91c1c"
+                      : statusBadgeVariant === "warning"
+                      ? "#92400e"
+                      : statusBadgeVariant === "success"
+                      ? "#065f46"
+                      : "var(--text-secondary)",
+                  border: `1px solid ${
+                    statusBadgeVariant === "danger"
+                      ? "#fca5a5"
+                      : statusBadgeVariant === "warning"
+                      ? "#fde68a"
+                      : statusBadgeVariant === "success"
+                      ? "#a7f3d0"
+                      : "var(--border-light)"
+                  }`,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}
+              >
+                {statusBadgeText}
+              </span>
+            )}
+          </div>
+
+          <div className="pdf-modal-actions" style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
+            {extraAction}
+            {onRotateLeft && onRotateRight && !isProtected && (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                <button
+                  type="button"
+                  onClick={onRotateLeft}
+                  title="Rotate Left (90° CCW)"
+                  aria-label="Rotate page left 90 degrees"
+                  style={{
+                    padding: "0.35rem 0.65rem",
+                    fontSize: "0.8125rem",
+                    fontWeight: 700,
+                    borderRadius: "6px",
+                    border: "1px solid var(--border-light)",
+                    background: "#ffffff",
+                    color: "var(--primary)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.3rem",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="1 4 1 10 7 10" />
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                  </svg>
+                  <span>Rotate Left</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onRotateRight}
+                  title="Rotate Right (90° CW)"
+                  aria-label="Rotate page right 90 degrees"
+                  style={{
+                    padding: "0.35rem 0.65rem",
+                    fontSize: "0.8125rem",
+                    fontWeight: 700,
+                    borderRadius: "6px",
+                    border: "1px solid var(--border-light)",
+                    background: "#ffffff",
+                    color: "var(--primary)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.3rem",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                  </svg>
+                  <span>Rotate Right</span>
+                </button>
+
+                {shouldDisplayAngle && (
+                  <span
+                    style={{
+                      fontSize: "0.8125rem",
+                      fontWeight: 800,
+                      color: normAngle !== 0 ? "var(--primary)" : "var(--text-muted)",
+                      padding: "0 0.35rem",
+                      minWidth: "36px",
+                      textAlign: "center",
+                    }}
+                  >
+                    {normAngle}°
+                  </span>
+                )}
+              </div>
+            )}
+
             <button
               type="button"
-              onClick={onRotateRight}
-              title="Rotate Right (90° CW)"
-              aria-label="Rotate page right 90 degrees"
-              style={{
-                border: "none",
-                background: "transparent",
-                color: "var(--primary)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.3rem",
-                fontWeight: 700,
-                fontSize: "0.8125rem",
-              }}
+              className="modal-close-btn"
+              onClick={onClose}
+              title="Close preview (Esc)"
+              aria-label="Close"
             >
-              <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="23 4 23 10 17 10" />
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-              </svg>
-              <span>Rotate Right</span>
+              &times;
             </button>
           </div>
-        )}
+        </div>
 
-        {/* Loading Spinner */}
-        {loading && (
-          <div className="pdf-modal-loading">
-            <div className="spinner" />
-            <span>Loading preview...</span>
-          </div>
-        )}
-
-        {/* Pure Page Canvas */}
-        <canvas
-          ref={canvasRef}
-          className="pdf-zoom-page-canvas"
+        {/* Modal Body */}
+        <div
+          className="pdf-modal-body"
           style={{
-            transform: normAngle ? `rotate(${normAngle}deg) scale(${scaleRatio})` : undefined,
-            transition: "transform 0.24s cubic-bezier(0.4, 0, 0.2, 1)",
+            flex: 1,
+            overflow: "hidden",
+            padding: "1rem",
+            background: "#f1f5f9",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            position: "relative",
+            minHeight: 0,
+            width: "100%",
+            boxSizing: "border-box",
           }}
-        />
-      </div>
+        >
+          {loading && (
+            <div className="pdf-modal-loading">
+              <div className="spinner" />
+              <span>Rendering preview...</span>
+            </div>
+          )}
+
+          <div
+            className="pdf-modal-canvas-wrapper"
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                transform: `rotate(${normAngle}deg) scale(${scaleRatio})`,
+                transition: "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                willChange: "transform",
+              }}
+            >
+              <canvas
+                ref={canvasRef}
+                className="pdf-modal-canvas"
+                style={{
+                  maxWidth: "calc(88vw - 40px)",
+                  maxHeight: "calc(80vh - 120px)",
+                  width: "auto",
+                  height: "auto",
+                  objectFit: "contain",
+                  boxShadow: "0 10px 35px rgba(0, 0, 0, 0.18)",
+                  borderRadius: "6px",
+                  display: "block",
+                  background: "#ffffff",
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </dialog>
     </div>
   );
 }

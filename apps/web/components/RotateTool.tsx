@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { renderPdfPage, loadPdfPagesMap } from "../lib/pdfjs";
 import { runTool } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
 import PdfZoomModal from "./PdfZoomModal";
+import ToolResultsView from "./ToolResultsView";
+import ToolProgressBar from "./ToolProgressBar";
+import ToolWorkspaceShell from "./ToolWorkspaceShell";
+import ToolPanelHeader from "./ToolPanelHeader";
 import type { OutputFile } from "@pdfkit/core";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -267,175 +271,8 @@ function RotatePageCard({
   );
 }
 
-/* ── Results View ────────────────────────────────────────────── */
-function RotateResultsView({
-  results,
-  isZipping,
-  onDownloadAllZip,
-  onRotateMore,
-}: {
-  readonly results: readonly { readonly name: string; readonly url: string; readonly size: number }[];
-  readonly isZipping: boolean;
-  readonly onDownloadAllZip: () => void;
-  readonly onRotateMore: () => void;
-}) {
-  return (
-    <div className="tool-runner-panel" style={{ maxWidth: 860, margin: "0 auto" }}>
-      <div
-        style={{
-          background: "var(--bg-surface)",
-          border: "1.5px solid var(--border-light)",
-          borderRadius: "var(--radius-lg)",
-          padding: "2.5rem 2rem",
-          boxShadow: "var(--shadow-md)",
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: "50%",
-            background: "var(--success-subtle)",
-            border: "1.5px solid var(--success-border)",
-            color: "var(--success)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto 1.25rem",
-          }}
-        >
-          <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-        </div>
-
-        <h2 style={{ fontSize: "1.625rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.5rem" }}>
-          PDFs Rotated Successfully!
-        </h2>
-        <p style={{ color: "var(--text-secondary)", fontSize: "0.9375rem", marginBottom: "2rem" }}>
-          {results.length === 1
-            ? "Your rotated document is ready to download."
-            : `All ${results.length} documents have been rotated and are ready.`}
-        </p>
-
-        {results.length > 1 && (
-          <div style={{ marginBottom: "2rem" }}>
-            <button
-              type="button"
-              onClick={onDownloadAllZip}
-              disabled={isZipping}
-              className="btn-primary"
-              style={{
-                fontSize: "1.0625rem",
-                padding: "0.875rem 2rem",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.6rem",
-                boxShadow: "var(--shadow-md)",
-              }}
-            >
-              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span>{isZipping ? "Creating ZIP..." : `Download All ${results.length} PDFs (ZIP)`}</span>
-            </button>
-          </div>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", textAlign: "left", marginBottom: "2.5rem" }}>
-          {results.map((r, i) => (
-            <div
-              key={`${r.name}-${i}`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "0.875rem 1.25rem",
-                background: "var(--bg-subtle)",
-                border: "1px solid var(--border-light)",
-                borderRadius: "var(--radius-md)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", overflow: "hidden" }}>
-                <div style={{ color: "var(--primary)" }}>
-                  <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <path d="M10 12h4" />
-                    <path d="M10 16h4" />
-                  </svg>
-                </div>
-                <div style={{ overflow: "hidden" }}>
-                  <div style={{ fontWeight: 600, color: "var(--text-main)", textOverflow: "ellipsis", whiteSpace: "nowrap", overflow: "hidden" }}>
-                    {r.name}
-                  </div>
-                  <div style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
-                    {formatBytes(r.size)}
-                  </div>
-                </div>
-              </div>
-
-              <a
-                href={r.url}
-                download={r.name}
-                className="btn-secondary"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.4rem",
-                  padding: "0.5rem 1rem",
-                  fontSize: "0.875rem",
-                  textDecoration: "none",
-                  flexShrink: 0,
-                }}
-              >
-                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                <span>Download</span>
-              </a>
-            </div>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          onClick={onRotateMore}
-          className="btn-secondary"
-          style={{ padding: "0.65rem 1.5rem" }}
-        >
-          Rotate More Files
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ── Right Panel Subcomponents & Tabs ────────────────────────── */
+/* ── Right Panel: Tabs & Subcomponents ──────────────────────── */
 type RotateTab = "controls" | "range" | "pages";
-
-const rotateDirBtnStyle: React.CSSProperties = {
-  padding: "1rem 0.5rem",
-  borderRadius: "var(--radius-md)",
-  border: "1.5px solid var(--border-medium)",
-  background: "var(--bg-surface)",
-  color: "var(--primary)",
-  fontWeight: 800,
-  fontSize: "0.9375rem",
-  cursor: "pointer",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: "0.35rem",
-  boxShadow: "0 2px 6px rgba(124,58,237,0.08)",
-  transition: "all 0.15s ease",
-};
 
 function RotateControlsTab({
   onRotateGlobalLeft,
@@ -452,14 +289,29 @@ function RotateControlsTab({
         Rotate Controls
       </h3>
       <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
-        Choose rotation direction for all selected PDFs. Pages configured in tabs 2 &amp; 3 will remain protected.
+        Choose rotation direction for all selected PDFs. Pages configured in tabs 2 & 3 will remain protected.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.875rem" }}>
         <button
           type="button"
           onClick={onRotateGlobalLeft}
-          style={rotateDirBtnStyle}
+          style={{
+            padding: "1rem 0.5rem",
+            borderRadius: "var(--radius-md)",
+            border: "1.5px solid var(--border-medium)",
+            background: "var(--bg-surface)",
+            color: "var(--primary)",
+            fontWeight: 800,
+            fontSize: "0.9375rem",
+            cursor: "pointer",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "0.35rem",
+            boxShadow: "0 2px 6px rgba(124,58,237,0.08)",
+            transition: "all 0.15s ease",
+          }}
         >
           <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="1 4 1 10 7 10" />
@@ -472,7 +324,22 @@ function RotateControlsTab({
         <button
           type="button"
           onClick={onRotateGlobalRight}
-          style={rotateDirBtnStyle}
+          style={{
+            padding: "1rem 0.5rem",
+            borderRadius: "var(--radius-md)",
+            border: "1.5px solid var(--border-medium)",
+            background: "var(--bg-surface)",
+            color: "var(--primary)",
+            fontWeight: 800,
+            fontSize: "0.9375rem",
+            cursor: "pointer",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "0.35rem",
+            boxShadow: "0 2px 6px rgba(124,58,237,0.08)",
+            transition: "all 0.15s ease",
+          }}
         >
           <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="23 4 23 10 17 10" />
@@ -504,10 +371,10 @@ function RotateControlsTab({
           }}
         >
           <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="1 4 1 10 7 10" />
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
           </svg>
-          <span>Reset All to Original</span>
+          <span>Reset All to 0°</span>
         </button>
       </div>
     </div>
@@ -779,68 +646,16 @@ function RotateFooter({
       </div>
 
       {isRunning ? (
-        <div>
-          <div
-            style={{
-              width: "100%",
-              height: 8,
-              borderRadius: 99,
-              background: "var(--border-light)",
-              overflow: "hidden",
-              marginBottom: "0.6rem",
-            }}
-          >
-            <div
-              style={{
-                width: `${progress ?? 0}%`,
-                height: "100%",
-                background: "var(--primary)",
-                borderRadius: 99,
-                transition: "width 0.2s ease",
-              }}
-            />
-          </div>
-          <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", textAlign: "center", marginBottom: "0.75rem" }}>
-            {statusMsg}
-          </p>
-          {cancel && (
-            <button
-              type="button"
-              onClick={cancel}
-              style={{
-                width: "100%",
-                padding: "0.5rem",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--danger-border)",
-                background: "var(--danger-subtle)",
-                color: "var(--danger)",
-                fontWeight: 700,
-                fontSize: "0.8125rem",
-                cursor: "pointer",
-              }}
-            >
-              Cancel
-            </button>
-          )}
-        </div>
+        <ToolProgressBar
+          progress={progress ? progress / 100 : 0}
+          statusMsg={statusMsg}
+          onCancel={cancel}
+        />
       ) : (
         <button
           type="button"
           onClick={onRotateSubmit}
-          className="btn-primary"
-          style={{
-            width: "100%",
-            padding: "0.875rem 1rem",
-            fontSize: "1.0625rem",
-            fontWeight: 800,
-            borderRadius: "var(--radius-md)",
-            boxShadow: "var(--shadow-md)",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.5rem",
-          }}
+          className="btn-primary tool-action-btn"
         >
           <span>{filesCount > 1 ? `Rotate ${filesCount} PDFs` : "Rotate PDF"}</span>
         </button>
@@ -904,22 +719,7 @@ function RotateRightPanel({
   readonly onRotateSubmit: () => void;
 }) {
   return (
-    <div
-      style={{
-        background: "var(--bg-surface)",
-        border: "1.5px solid var(--border-light)",
-        borderRadius: "var(--radius-lg)",
-        padding: "1.5rem",
-        boxShadow: "var(--shadow-sm)",
-        position: "sticky",
-        top: "5.5rem",
-        maxHeight: "calc(100vh - 7rem)",
-        overflowY: "auto",
-        minWidth: 0,
-        boxSizing: "border-box",
-        zIndex: 10,
-      }}
-    >
+    <div className="tool-sticky-panel">
       {/* Tab Navigation */}
       <div
         style={{
@@ -1040,13 +840,12 @@ export default function RotateTool() {
   /* Files State */
   const [files, setFiles] = useState<File[]>([]);
   const [filePagesMap, setFilePagesMap] = useState<Record<string, number>>({});
-  const [isDragging, setIsDragging] = useState(false);
 
   /* Per-page angle map: key = "filename-pageNum", value = cumulative angle degrees */
   const [pageAngles, setPageAngles] = useState<Record<string, number>>({});
 
   /* Right Panel Tabs: "controls" (Tab 1), "range" (Tab 2), "pages" (Tab 3) */
-  const [activeTab, setActiveTab] = useState<"controls" | "range" | "pages">("controls");
+  const [activeTab, setActiveTab] = useState<RotateTab>("controls");
 
   /* Tab 2: Range of Pages to NOT Rotate */
   const [rangeEnabled, setRangeEnabled] = useState(false);
@@ -1137,21 +936,13 @@ export default function RotateTool() {
 
     setFiles(updatedFiles);
 
-    // Fetch page counts for all files in parallel
-    const missingFiles = arr.filter((f) => !filePagesMap[f.name]);
-    if (missingFiles.length > 0) {
-      const infos = await Promise.all(missingFiles.map((f) => getPdfInfo(f)));
-      const newPagesMap = { ...filePagesMap };
-      missingFiles.forEach((f, idx) => {
-        newPagesMap[f.name] = infos[idx]?.numPages ?? 1;
-      });
-      setFilePagesMap(newPagesMap);
+    const newPagesMap = await loadPdfPagesMap(arr, filePagesMap);
+    setFilePagesMap(newPagesMap);
 
-      const highestPage = Object.values(newPagesMap).reduce((m, c) => Math.max(m, c), 1);
-      if (!rangeEnabled) {
-        setRangeFrom(1);
-        setRangeTo(Math.min(highestPage, 2));
-      }
+    const highestPage = Object.values(newPagesMap).reduce((m, c) => Math.max(m, c), 1);
+    if (!rangeEnabled) {
+      setRangeFrom(1);
+      setRangeTo(Math.min(highestPage, 2));
     }
   }
 
@@ -1293,207 +1084,44 @@ export default function RotateTool() {
     }
   }
 
-  /* ── Drag & Drop Handlers ────────────────────────────────── */
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        void handleFileSelect(e.dataTransfer.files, files.length > 0);
-      }
-    },
-    [files.length]
-  );
-
-  const onDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
-
-  const onDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
   /* ── RENDER: Results View ────────────────────────────────── */
   if (results.length > 0) {
     return (
-      <RotateResultsView
+      <ToolResultsView
+        title="PDFs Rotated Successfully!"
+        subtitle={
+          results.length === 1
+            ? "Your rotated document is ready to download."
+            : `All ${results.length} documents have been rotated and are ready.`
+        }
         results={results}
+        resetLabel="Rotate More Files"
+        onReset={clearAllFiles}
+        onDownloadZip={() => { void handleDownloadAllZip(); }}
         isZipping={isZipping}
-        onDownloadAllZip={() => { void handleDownloadAllZip(); }}
-        onRotateMore={clearAllFiles}
       />
     );
   }
 
-  /* ── RENDER: Initial Empty State (Dropzone) ──────────────── */
-  if (files.length === 0) {
-    return (
-      <div className="tool-runner-panel" style={{ maxWidth: 860, margin: "0 auto" }}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          hidden
-          multiple
-          accept="application/pdf"
-          onChange={(e) => {
-            void handleFileSelect(e.target.files, false);
-            e.target.value = "";
-          }}
-        />
-
-        <div className="dropzone-container">
-          <button
-            type="button"
-            className={`dropzone ${isDragging ? "active" : ""}`}
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
-            onClick={() => fileInputRef.current?.click()}
-            style={{ width: "100%", fontFamily: "inherit", cursor: "pointer" }}
-          >
-            <svg aria-hidden="true" className="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-
-            <p className="dropzone-text-primary">
-              Choose PDF files, or drag and drop here
-            </p>
-            <span className="dropzone-badge">
-              Multiple files (.pdf)
-            </span>
-          </button>
-        </div>
-
-        {error && (
-          <div className="alert-error" style={{ marginTop: "1rem" }}>
-            {error}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  /* ── RENDER: Active Workspace (All PDFs together) ───────────── */
+  /* ── RENDER: Document Rotation Studio ──────────────────────── */
   return (
-    <div style={{ width: "100%", maxWidth: "100%", margin: "0 auto", paddingBottom: "3rem", overflowX: "clip", boxSizing: "border-box" }}>
-      <input
-        ref={fileInputRef}
-        type="file"
-        hidden
-        multiple
-        accept="application/pdf"
-        onChange={(e) => {
-          void handleFileSelect(e.target.files, true);
-          e.target.value = "";
-        }}
-      />
-
-      {/* Top Upload Banner */}
-      <div className="dropzone-container" style={{ marginBottom: "1.25rem" }}>
-        <button
-          type="button"
-          className={`dropzone ${isDragging ? "active" : ""}`}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-          onClick={() => fileInputRef.current?.click()}
-          style={{ width: "100%", fontFamily: "inherit", cursor: "pointer", padding: "1.25rem", minHeight: "auto" }}
-        >
-          <svg
-            aria-hidden="true"
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ color: "var(--primary)" }}
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-          <p className="dropzone-text-primary" style={{ margin: 0, fontSize: "0.9375rem" }}>
-            Click or drop more files to add
-          </p>
-          <span className="dropzone-badge" style={{ margin: 0 }}>
-            {files.length} {files.length === 1 ? "PDF" : "PDFs"} selected ({totalPagesAllFiles} pages total)
-          </span>
-        </button>
-      </div>
-
+    <ToolWorkspaceShell
+      error={error}
+      fileInputRef={fileInputRef}
+      filesCount={files.length}
+      totalPages={totalPagesAllFiles}
+      onFilesSelected={handleFileSelect}
+    >
       {/* 2-Column Interface: Left = All Pages Preview, Right = 3 Tabs Control Panel */}
-      <div
-        className="rotate-workspace-layout"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) 360px",
-          gap: "1.5rem",
-          alignItems: "start",
-          width: "100%",
-          boxSizing: "border-box",
-        }}
-      >
+      <div className="rotate-workspace-layout">
         {/* LEFT PANEL: Preview of all pages of all selected PDFs */}
-        <div
-          style={{
-            background: "var(--bg-surface)",
-            border: "1.5px solid var(--border-light)",
-            borderRadius: "var(--radius-lg)",
-            padding: "1.5rem",
-            boxShadow: "var(--shadow-sm)",
-            minHeight: "560px",
-            minWidth: 0,
-            overflowX: "hidden",
-            boxSizing: "border-box",
-          }}
-        >
+        <div className="tool-left-panel">
           {/* Header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              borderBottom: "1.5px solid var(--border-light)",
-              paddingBottom: "0.875rem",
-              marginBottom: "1.5rem",
-            }}
-          >
-            <div>
-              <h2 style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--text-main)", margin: 0 }}>
-                Pages Preview
-              </h2>
-              <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0.2rem 0 0 0" }}>
-                All pages of all selected PDFs are shown vertically. Use the right panel or card buttons to rotate.
-              </p>
-            </div>
-
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              <button
-                type="button"
-                onClick={clearAllFiles}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "var(--danger)",
-                  fontSize: "0.8125rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Clear All
-              </button>
-            </div>
-          </div>
+          <ToolPanelHeader
+            title="Pages Preview"
+            description="All pages of all selected PDFs are shown vertically. Use the right panel or card buttons to rotate."
+            onClear={clearAllFiles}
+          />
 
           {/* Unified list of all documents and their pages */}
           <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
@@ -1672,6 +1300,6 @@ export default function RotateTool() {
           />
         );
       })()}
-    </div>
+    </ToolWorkspaceShell>
   );
 }

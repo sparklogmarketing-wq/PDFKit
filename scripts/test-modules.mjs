@@ -5,6 +5,7 @@ import { parsePageSpec, ToolError } from "../packages/core/src/index.ts";
 import mergeMod from "../packages/mod-merge/src/index.ts";
 import splitMod from "../packages/mod-split/src/index.ts";
 import rotateMod from "../packages/mod-rotate/src/index.ts";
+import removeMod from "../packages/mod-remove/src/index.ts";
 import organizeMod from "../packages/mod-organize/src/index.ts";
 import extractMod from "../packages/mod-extract/src/index.ts";
 
@@ -217,6 +218,53 @@ test("mod-rotate", async (t) => {
   });
 });
 
+test("mod-remove", async (t) => {
+  const pdf = await createSamplePdf(5); // 5 pages
+  const ctx = { signal: new AbortController().signal, onProgress: () => {} };
+
+  await t.test("fails if no pages are selected", async () => {
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], {}, ctx),
+      /No pages selected for removal/
+    );
+  });
+
+  await t.test("fails if all pages are removed", async () => {
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pages: "1-5" }, ctx),
+      /Cannot remove all pages/
+    );
+  });
+
+  await t.test("removes single page by range string", async () => {
+    const results = await removeMod.run([{ name: "doc.pdf", data: pdf }], { pages: "2" }, ctx);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "doc-removed.pdf");
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 4);
+  });
+
+  await t.test("removes multiple pages and ranges", async () => {
+    // remove pages 1, 3-4 from 5 pages -> keeps page 2 and page 5 (total 2 pages)
+    const results = await removeMod.run([{ name: "doc.pdf", data: pdf }], { pages: "1, 3-4" }, ctx);
+    assert.equal(results.length, 1);
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 2);
+  });
+
+  await t.test("removes pages using explicit pageIndices array", async () => {
+    // 0-based index 0 and 4 -> leaves 3 pages
+    const results = await removeMod.run([{ name: "report.pdf", data: pdf }], {
+      pageIndices: [0, 4],
+      outputFileName: "clean-report.pdf",
+    }, ctx);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "clean-report.pdf");
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 3);
+  });
+});
+
 test("mod-organize", async (t) => {
   const pdfA = await createSamplePdf(3); // 3 pages (0, 1, 2)
   const pdfB = await createSamplePdf(2); // 2 pages (0, 1)
@@ -331,3 +379,4 @@ test("mod-extract", async (t) => {
     }, /No pages selected/);
   });
 });
+

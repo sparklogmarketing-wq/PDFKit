@@ -12,6 +12,7 @@
     "@pdfkit/mod-extract": "*",
     "@pdfkit/mod-merge": "*",
     "@pdfkit/mod-organize": "*",
+    "@pdfkit/mod-remove": "*",
     "@pdfkit/mod-rotate": "*",
     "@pdfkit/mod-split": "*",
     "jszip": "^3.10.2",

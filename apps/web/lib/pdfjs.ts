@@ -65,6 +65,21 @@ export async function getPdfInfo(file: File): Promise<{ numPages: number } | nul
   }
 }
 
+/** Efficiently fetch page counts for any files not already present in the map */
+export async function loadPdfPagesMap(
+  files: readonly File[],
+  currentMap: Record<string, number>
+): Promise<Record<string, number>> {
+  const missing = files.filter((f) => !currentMap[f.name]);
+  if (missing.length === 0) return currentMap;
+  const infos = await Promise.all(missing.map((f) => getPdfInfo(f)));
+  const updated = { ...currentMap };
+  missing.forEach((f, idx) => {
+    updated[f.name] = infos[idx]?.numPages ?? 1;
+  });
+  return updated;
+}
+
 // Queue sequential renders so parallel worker canvas operations never collide or invert
 let renderQueue: Promise<any> = Promise.resolve();
 

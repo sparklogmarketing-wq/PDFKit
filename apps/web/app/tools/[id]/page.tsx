@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ToolRunner from "../../../components/ToolRunner";
+import MergeTool from "../../../components/MergeTool";
 import SplitTool from "../../../components/SplitTool";
 import RotateTool from "../../../components/RotateTool";
+import RemoveTool from "../../../components/RemoveTool";
 import OrganizeTool from "../../../components/OrganizeTool";
 import ExtractTool from "../../../components/ExtractTool";
 import { ToolIcon } from "../../../components/ToolIcon";
@@ -28,10 +30,14 @@ export default async function ToolPage({ params }: { readonly params: Promise<{ 
 
   // Resolve tool component based on id to avoid nested ternary
   let toolComponent: React.ReactNode;
-  if (id === "split") {
+  if (id === "merge") {
+    toolComponent = <MergeTool />;
+  } else if (id === "split") {
     toolComponent = <SplitTool />;
   } else if (id === "rotate") {
     toolComponent = <RotateTool />;
+  } else if (id === "remove") {
+    toolComponent = <RemoveTool />;
   } else if (id === "organize") {
     toolComponent = <OrganizeTool />;
   } else if (id === "extract") {
