@@ -13,8 +13,14 @@ export interface RotateOptions {
   readonly pages?: string;
   readonly excludePages?: string;
   readonly customRotations?: CustomRotationRule[];
+  /**
+   * Explicit per-page rotation overrides keyed by 1-based page number (e.g. { 1: 90, 2: 180 }).
+   */
   readonly pageRotations?: Record<string | number, number | string>;
   readonly fileRotations?: Record<string | number, {
+    /**
+     * Explicit per-page rotation overrides keyed by 1-based page number (e.g. { 1: 90, 2: 180 }).
+     */
     readonly pageRotations?: Record<string | number, number | string>;
     readonly customRotations?: CustomRotationRule[];
     readonly excludePages?: string;
@@ -60,12 +66,8 @@ function computePageDelta(
   targetIndices: Set<number>,
   fileBaseDegrees: number
 ): number {
-  // 1. Explicit per-page rotation
-  const explicitPageVal =
-    filePageRotations[pageIndex] ??
-    filePageRotations[pageIndex + 1] ??
-    filePageRotations[String(pageIndex)] ??
-    filePageRotations[String(pageIndex + 1)];
+  // 1. Explicit per-page rotation (keyed by 1-based page number)
+  const explicitPageVal = filePageRotations[pageIndex + 1];
 
   if (explicitPageVal !== undefined && explicitPageVal !== null && explicitPageVal !== "") {
     return parseDegrees(explicitPageVal, 0);
