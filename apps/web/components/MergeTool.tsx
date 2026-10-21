@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { loadPdfPagesMap } from "../lib/pdfjs";
-import { runTool } from "../lib/runTool";
+import { runTool, isCancelledError } from "../lib/runTool";
 import { calculateTotalPages, filterPdfFiles, appendUniqueFiles } from "../lib/format";
 import PdfZoomModal from "./PdfZoomModal";
 import PdfThumbnailCard from "./PdfThumbnailCard";
@@ -376,9 +376,13 @@ export default function MergeTool() {
   const [cancel, setCancel] = useState<(() => void) | null>(null);
   const isRunning = progress !== null;
 
-  /* Cleanup object URLs on unmount */
+  const cancelRef = useRef<(() => void) | null>(null);
+  cancelRef.current = cancel;
+
+  /* Cleanup object URLs and cancel running worker on unmount */
   useEffect(() => {
     return () => {
+      cancelRef.current?.();
       results.forEach((res) => URL.revokeObjectURL(res.url));
     };
   }, [results]);
@@ -467,9 +471,11 @@ export default function MergeTool() {
         setZoomTarget({ file: rotatedFile, index });
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      console.error("Failed to rotate file:", err);
-      setError("Failed to rotate document: " + msg);
+      if (!isCancelledError(err)) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        console.error("Failed to rotate file:", err);
+        setError("Failed to rotate document: " + msg);
+      }
     } finally {
       setRotatingIdx(null);
     }
@@ -549,13 +555,13 @@ export default function MergeTool() {
       });
 
       setResults(res);
-      setProgress(null);
-      setStatusMessage("");
-      setCancel(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "An error occurred during merging.";
-      console.error("Merge error:", err);
-      setError(msg);
+      if (!isCancelledError(err)) {
+        const msg = err instanceof Error ? err.message : "An error occurred during merging.";
+        console.error("Merge error:", err);
+        setError(msg);
+      }
+    } finally {
       setProgress(null);
       setStatusMessage("");
       setCancel(null);

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
-import { runTool } from "../lib/runTool";
+import { runTool, isCancelledError } from "../lib/runTool";
 import { formatBytes, formatPagesToRangeString } from "../lib/format";
 import { parsePageSpec } from "@pdfkit/core";
 import PdfZoomModal from "./PdfZoomModal";
@@ -550,9 +550,13 @@ export default function RemoveTool() {
   const [cancel, setCancel] = useState<(() => void) | null>(null);
   const isRunning = progress !== null;
 
-  /* Cleanup object URLs on unmount */
+  const cancelRef = useRef<(() => void) | null>(null);
+  cancelRef.current = cancel;
+
+  /* Cleanup object URLs and cancel running worker on unmount */
   useEffect(() => {
     return () => {
+      cancelRef.current?.();
       for (const res of results) {
         URL.revokeObjectURL(res.url);
       }
@@ -688,13 +692,13 @@ export default function RemoveTool() {
       });
 
       setResults(items);
-      setProgress(null);
-      setStatusMessage("");
-      setCancel(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "An error occurred while removing pages.";
-      console.error("Remove pages error:", err);
-      setError(msg);
+      if (!isCancelledError(err)) {
+        const msg = err instanceof Error ? err.message : "An error occurred while removing pages.";
+        console.error("Remove pages error:", err);
+        setError(msg);
+      }
+    } finally {
       setProgress(null);
       setStatusMessage("");
       setCancel(null);

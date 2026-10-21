@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { FieldDef, OutputFile, ToolManifest } from "@pdfkit/core";
-import { runTool } from "../lib/runTool";
+import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import PdfThumbnailCard from "./PdfThumbnailCard";
 import PdfZoomModal from "./PdfZoomModal";
@@ -230,7 +230,9 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
         }))
       );
     } catch (e: any) {
-      setError(e?.message || "An unexpected error occurred during processing.");
+      if (!isCancelledError(e)) {
+        setError(e?.message || "An unexpected error occurred during processing.");
+      }
     } finally {
       setProgress(null);
       setCancel(null);
@@ -513,9 +515,6 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
               className="btn-danger-outline"
               onClick={() => {
                 cancel();
-                setProgress(null);
-                setCancel(null);
-                setStatusMessage("Operation cancelled");
               }}
             >
               Cancel

@@ -8,6 +8,7 @@ import rotateMod from "../packages/mod-rotate/src/index.ts";
 import removeMod from "../packages/mod-remove/src/index.ts";
 import organizeMod from "../packages/mod-organize/src/index.ts";
 import extractMod from "../packages/mod-extract/src/index.ts";
+import "./test-cancellation.mjs";
 
 async function createSamplePdf(pages = 3) {
   const doc = await PDFDocument.create();
