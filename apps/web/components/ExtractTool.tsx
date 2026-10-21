@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
-import { runTool } from "../lib/runTool";
+import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
 import PdfZoomModal from "./PdfZoomModal";
@@ -317,7 +317,7 @@ export default function ExtractTool() {
 
       setResults(outputFiles);
     } catch (err: any) {
-      if (err?.message !== "Cancelled") {
+      if (!isCancelledError(err)) {
         setError(err?.message || "Failed to extract pages.");
       }
     } finally {
@@ -731,12 +731,7 @@ export default function ExtractTool() {
               <button
                 type="button"
                 className="btn-danger-outline"
-                onClick={() => {
-                  cancelTask?.();
-                  setIsRunning(false);
-                  setProgress(null);
-                  setCancelTask(null);
-                }}
+                onClick={() => { cancelTask?.(); }}
               >
                 Cancel
               </button>

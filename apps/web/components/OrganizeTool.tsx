@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
-import { runTool } from "../lib/runTool";
+import { runTool, isCancelledError } from "../lib/runTool";
 import { formatBytes } from "../lib/formatBytes";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
@@ -704,11 +704,11 @@ export default function OrganizeTool() {
       }));
 
       setResults(mapped);
-      setProgress(null);
-      setStatusMsg("");
-      setCancel(null);
     } catch (err: any) {
-      setError(err?.message ?? "An error occurred while organizing the PDF.");
+      if (!isCancelledError(err)) {
+        setError(err?.message ?? "An error occurred while organizing the PDF.");
+      }
+    } finally {
       setProgress(null);
       setStatusMsg("");
       setCancel(null);
@@ -1175,9 +1175,6 @@ export default function OrganizeTool() {
                 className="btn-danger-outline"
                 onClick={() => {
                   cancel?.();
-                  setProgress(null);
-                  setCancel(null);
-                  setStatusMsg("Cancelled.");
                 }}
               >
                 Cancel

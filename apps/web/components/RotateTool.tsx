@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { renderPdfPage, loadPdfPagesMap } from "../lib/pdfjs";
-import { runTool } from "../lib/runTool";
+import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
 import PdfZoomModal from "./PdfZoomModal";
@@ -867,9 +867,13 @@ export default function RotateTool() {
   const [isZipping, setIsZipping] = useState(false);
   const isRunning = progress !== null;
 
-  /* Cleanup object URLs on unmount */
+  const cancelRef = useRef<(() => void) | null>(null);
+  cancelRef.current = cancel;
+
+  /* Cleanup object URLs and cancel running worker on unmount */
   useEffect(() => {
     return () => {
+      cancelRef.current?.();
       results.forEach((r) => URL.revokeObjectURL(r.url));
     };
   }, [results]);
@@ -1059,12 +1063,12 @@ export default function RotateTool() {
       });
 
       setResults(res);
-      setProgress(null);
-      setStatusMsg("");
-      setCancel(null);
     } catch (err: any) {
-      console.error("Rotation error:", err);
-      setError(err?.message || "An error occurred during rotation.");
+      if (!isCancelledError(err)) {
+        console.error("Rotation error:", err);
+        setError(err?.message || "An error occurred during rotation.");
+      }
+    } finally {
       setProgress(null);
       setStatusMsg("");
       setCancel(null);

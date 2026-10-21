@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
-import { runTool } from "../lib/runTool";
+import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
@@ -643,11 +643,11 @@ export default function SplitTool() {
         size: o.data.byteLength,
       }));
       setResults(mapped);
-      setProgress(null);
-      setStatusMsg("");
-      setCancel(null);
     } catch (err: any) {
-      setError(err?.message ?? "An error occurred.");
+      if (!isCancelledError(err)) {
+        setError(err?.message ?? "An error occurred.");
+      }
+    } finally {
       setProgress(null);
       setStatusMsg("");
       setCancel(null);
@@ -1381,7 +1381,7 @@ export default function SplitTool() {
               <button
                 type="button"
                 className="btn-danger-outline"
-                onClick={() => { cancel?.(); setProgress(null); setCancel(null); setStatusMsg("Cancelled."); }}
+                onClick={() => { cancel?.(); }}
               >
                 Cancel
               </button>
