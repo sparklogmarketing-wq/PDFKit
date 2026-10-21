@@ -217,6 +217,109 @@ test("mod-rotate", async (t) => {
     assert.equal(doc.getPage(1).getRotation().angle, 180);
     assert.equal(doc.getPage(2).getRotation().angle, 270);
   });
+
+  await t.test("rotates single page correctly in full per-page map (single non-zero page)", async () => {
+    // Rotating page 3 of 3 sends { 1: 0, 2: 0, 3: 90 }
+    const resultsPage3 = await rotateMod.run([
+      { name: "doc.pdf", data: pdf },
+    ], {
+      pageRotations: { 1: 0, 2: 0, 3: 90 },
+    }, ctx);
+    const doc3 = await PDFDocument.load(resultsPage3[0].data);
+    assert.equal(doc3.getPage(0).getRotation().angle, 0);
+    assert.equal(doc3.getPage(1).getRotation().angle, 0);
+    assert.equal(doc3.getPage(2).getRotation().angle, 90);
+
+    // Rotating page 1 of 3 sends { 1: 90, 2: 0, 3: 0 } - ensure page 2 is not shadowed
+    const resultsPage1 = await rotateMod.run([
+      { name: "doc.pdf", data: pdf },
+    ], {
+      pageRotations: { 1: 90, 2: 0, 3: 0 },
+    }, ctx);
+    const doc1 = await PDFDocument.load(resultsPage1[0].data);
+    assert.equal(doc1.getPage(0).getRotation().angle, 90);
+    assert.equal(doc1.getPage(1).getRotation().angle, 0);
+    assert.equal(doc1.getPage(2).getRotation().angle, 0);
+  });
+
+  await t.test("rotates first and last pages in a multi-page file", async () => {
+    const pdf4 = await createSamplePdf(4);
+    const results = await rotateMod.run([
+      { name: "doc4.pdf", data: pdf4 },
+    ], {
+      degrees: 0,
+      pageRotations: { 1: 90, 2: 0, 3: 0, 4: 270 },
+    }, ctx);
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPage(0).getRotation().angle, 90);
+    assert.equal(doc.getPage(1).getRotation().angle, 0);
+    assert.equal(doc.getPage(2).getRotation().angle, 0);
+    assert.equal(doc.getPage(3).getRotation().angle, 270);
+  });
+
+  await t.test("rotates multiple files with per-file per-page rotations", async () => {
+    const pdf2 = await createSamplePdf(2);
+    const results = await rotateMod.run([
+      { name: "file1.pdf", data: pdf2 },
+      { name: "file2.pdf", data: pdf },
+    ], {
+      fileRotations: {
+        0: { pageRotations: { 1: 90, 2: 0 } },
+        1: { pageRotations: { 1: 0, 2: 180, 3: 270 } },
+      },
+    }, ctx);
+
+    assert.equal(results.length, 2);
+    const doc1 = await PDFDocument.load(results[0].data);
+    assert.equal(doc1.getPage(0).getRotation().angle, 90);
+    assert.equal(doc1.getPage(1).getRotation().angle, 0);
+
+    const doc2 = await PDFDocument.load(results[1].data);
+    assert.equal(doc2.getPage(0).getRotation().angle, 0);
+    assert.equal(doc2.getPage(1).getRotation().angle, 180);
+    assert.equal(doc2.getPage(2).getRotation().angle, 270);
+  });
+
+  await t.test("honors precedence of explicit per-page rotations over custom rules and exclusions", async () => {
+    // page 1: explicit per-page rotation (90) overrides customRotations (180)
+    // page 2: customRotations (180) overrides base degrees
+    // page 3: excluded via excludePages (0)
+    const results = await rotateMod.run([
+      { name: "doc.pdf", data: pdf },
+    ], {
+      degrees: "270",
+      excludePages: "3",
+      customRotations: [
+        { pages: "1-2", degrees: "180" },
+      ],
+      pageRotations: { 1: 90 },
+    }, ctx);
+
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPage(0).getRotation().angle, 90); // explicit per-page override
+    assert.equal(doc.getPage(1).getRotation().angle, 180); // custom rule
+    assert.equal(doc.getPage(2).getRotation().angle, 0); // excluded
+  });
+
+  await t.test("integration test: Rotate UI payload rotating page 2 of 3 affects only page 2", async () => {
+    // Simulates the exact payload constructed by RotateTool.tsx
+    const results = await rotateMod.run([
+      { name: "doc.pdf", data: pdf },
+    ], {
+      degrees: 0,
+      fileRotations: {
+        0: {
+          pageRotations: { 1: 0, 2: 90, 3: 0 },
+          degrees: 0,
+        },
+      },
+    }, ctx);
+
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPage(0).getRotation().angle, 0);
+    assert.equal(doc.getPage(1).getRotation().angle, 90);
+    assert.equal(doc.getPage(2).getRotation().angle, 0);
+  });
 });
 
 test("mod-remove", async (t) => {
