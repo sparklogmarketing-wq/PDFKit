@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
@@ -75,28 +76,16 @@ function ExtractPageThumb({
   onToggle,
   onZoom,
 }: ExtractPageThumbProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    if (canvasRef.current) {
-      void renderPdfPage(file, canvasRef.current, pageNum, 180)
-        .then(() => {
-          if (active) setLoading(false);
-        })
-        .catch(() => {
-          if (active) setLoading(false);
-        });
-    }
-    return () => {
-      active = false;
-    };
-  }, [file, pageNum]);
+  const { canvasRef, containerRef, loading } = usePdfThumbnail({
+    file,
+    pageNum,
+    targetWidth: 180,
+    rootMargin: "300px 0px",
+  });
 
   return (
     <div
+      ref={containerRef}
       role="checkbox"
       aria-checked={isSelected}
       tabIndex={0}

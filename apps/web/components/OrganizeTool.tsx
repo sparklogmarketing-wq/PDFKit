@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { formatBytes } from "../lib/formatBytes";
 import PdfZoomModal from "./PdfZoomModal";
@@ -84,35 +85,20 @@ function OrganizePageCard({
   onInsertBlank,
   onInsertPdfClick,
 }: OrganizePageCardProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    if (item.isBlank || !file) {
-      setLoading(false);
-      return;
-    }
-    let active = true;
-    setLoading(true);
-    if (canvasRef.current) {
-      void renderPdfPage(file, canvasRef.current, item.pageIndex + 1, 180)
-        .then(() => {
-          if (active) setLoading(false);
-        })
-        .catch(() => {
-          if (active) setLoading(false);
-        });
-    }
-    return () => {
-      active = false;
-    };
-  }, [file, item.pageIndex, item.isBlank]);
+  const { canvasRef, containerRef, loading } = usePdfThumbnail({
+    file,
+    pageNum: item.pageIndex + 1,
+    targetWidth: 180,
+    rootMargin: "300px 0px",
+    enabled: !item.isBlank,
+  });
 
   const cardBorder = theme?.border || "#cbd5e1";
 
   return (
     <div
+      ref={containerRef}
       className={`organize-page-wrapper ${isDragging ? "dragging" : ""} ${isDropTarget ? "drop-target" : ""}`}
       draggable
       onDragStart={onDragStart}

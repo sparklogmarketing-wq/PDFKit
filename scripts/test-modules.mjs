@@ -9,6 +9,7 @@ import removeMod from "../packages/mod-remove/src/index.ts";
 import organizeMod from "../packages/mod-organize/src/index.ts";
 import extractMod from "../packages/mod-extract/src/index.ts";
 import "./test-cancellation.mjs";
+import "./test-pdf-cache-perf.mjs";
 
 async function createSamplePdf(pages = 3) {
   const doc = await PDFDocument.create();

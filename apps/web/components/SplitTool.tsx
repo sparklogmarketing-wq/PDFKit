@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import PdfZoomModal from "./PdfZoomModal";
@@ -174,22 +175,16 @@ function SelectablePageCard({
   onToggle: (p: number) => void;
   onZoom: (file: File, pageNum: number) => void;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    if (canvasRef.current) {
-      renderPdfPage(file, canvasRef.current, pageNum, 160).then(() => {
-        if (active) setLoading(false);
-      });
-    }
-    return () => { active = false; };
-  }, [file, pageNum]);
+  const { canvasRef, containerRef, loading } = usePdfThumbnail({
+    file,
+    pageNum,
+    targetWidth: 160,
+    rootMargin: "300px 0px",
+  });
 
   return (
     <div
+      ref={containerRef}
       className={`split-page-thumb ${isSelected ? "selected" : ""}`}
       onClick={() => onToggle(pageNum)}
     >
@@ -245,12 +240,20 @@ function SingleDocumentPreview({ file, onZoom }: { file: File; onZoom: () => voi
   useEffect(() => {
     let active = true;
     setLoading(true);
+    const controller = new AbortController();
     if (canvasRef.current) {
-      renderPdfPage(file, canvasRef.current, 1, 260).then(() => {
-        if (active) setLoading(false);
-      });
+      renderPdfPage(file, canvasRef.current, 1, 260, { signal: controller.signal })
+        .then(() => {
+          if (active) setLoading(false);
+        })
+        .catch(() => {
+          if (active) setLoading(false);
+        });
     }
-    return () => { active = false; };
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [file]);
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { useEffect, useState, useCallback } from "react";
+import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { formatBytes, formatPageCount } from "../lib/format";
 
 interface PdfThumbnailCardProps {
@@ -41,48 +41,28 @@ export default function PdfThumbnailCard({
   onRotate,
   onRemove,
 }: PdfThumbnailCardProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [loading, setLoading] = useState(true);
   const [numPages, setNumPages] = useState<number | null>(initialNumPages ?? null);
+  const handlePageLoaded = useCallback((pages: number) => {
+    setNumPages((prev) => prev ?? pages);
+  }, []);
+
+  const { canvasRef, containerRef, loading } = usePdfThumbnail({
+    file,
+    pageNum: 1,
+    targetWidth: 320,
+    rootMargin: "250px 0px",
+    onPageLoaded: handlePageLoaded,
+  });
 
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-
     if (initialNumPages !== undefined && initialNumPages !== null) {
       setNumPages(initialNumPages);
-    } else {
-      getPdfInfo(file)
-        .then((info) => {
-          if (!active) return;
-          if (info?.numPages) {
-            setNumPages(info.numPages);
-          }
-        })
-        .catch(() => {});
     }
-
-    if (canvasRef.current) {
-      void renderPdfPage(file, canvasRef.current, 1, 320)
-        .then((res) => {
-          if (!active) return;
-          setLoading(false);
-          if (res?.numPages) {
-            setNumPages(res.numPages);
-          }
-        })
-        .catch(() => {
-          if (active) setLoading(false);
-        });
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [file, initialNumPages]);
+  }, [initialNumPages]);
 
   return (
     <div
+      ref={containerRef}
       className={`pdf-thumb-card ${isDragging ? "dragging" : ""} ${
         isDropTarget ? "drop-target" : ""
       }`}

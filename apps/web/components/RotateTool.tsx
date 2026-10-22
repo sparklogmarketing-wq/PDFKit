@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { renderPdfPage, loadPdfPagesMap } from "../lib/pdfjs";
+import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
@@ -63,23 +64,12 @@ function RotatePageCard({
   readonly onRotateRight: () => void;
   readonly onZoom: () => void;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    if (canvasRef.current) {
-      void renderPdfPage(file, canvasRef.current, localPageNum, 260)
-        .then(() => {
-          if (active) setLoading(false);
-        })
-        .catch(() => {});
-    }
-    return () => {
-      active = false;
-    };
-  }, [file, localPageNum]);
+  const { canvasRef, containerRef, loading } = usePdfThumbnail({
+    file,
+    pageNum: localPageNum,
+    targetWidth: 260,
+    rootMargin: "300px 0px",
+  });
 
   const displayAngle = isProtected ? 0 : angle;
   // Scale down when rotated 90/270 so the portrait sheet frame stays intact
@@ -94,6 +84,7 @@ function RotatePageCard({
 
   return (
     <div
+      ref={containerRef}
       style={{
         display: "flex",
         flexDirection: "column",

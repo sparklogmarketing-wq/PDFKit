@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { formatBytes, formatPagesToRangeString } from "../lib/format";
 import { parsePageSpec } from "@pdfkit/core";
@@ -25,28 +26,16 @@ function RemovePageThumbnailCard({
   readonly onToggleDelete: (page: number) => void;
   readonly onZoom: (page: number) => void;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-
-    if (canvasRef.current) {
-      renderPdfPage(file, canvasRef.current, pageNum, 280)
-        .catch(() => {})
-        .finally(() => {
-          if (active) setLoading(false);
-        });
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [file, pageNum]);
+  const { canvasRef, containerRef, loading } = usePdfThumbnail({
+    file,
+    pageNum,
+    targetWidth: 280,
+    rootMargin: "300px 0px",
+  });
 
   return (
     <div
+      ref={containerRef}
       role="button"
       tabIndex={0}
       onClick={() => onToggleDelete(pageNum)}
