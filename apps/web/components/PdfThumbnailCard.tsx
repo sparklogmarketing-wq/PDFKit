@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { renderPdfPage } from "../lib/pdfjs";
-import { useInView } from "../lib/useInView";
+import { useEffect, useState, useCallback } from "react";
+import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { formatBytes, formatPageCount } from "../lib/format";
 
 interface PdfThumbnailCardProps {
@@ -42,48 +41,24 @@ export default function PdfThumbnailCard({
   onRotate,
   onRemove,
 }: PdfThumbnailCardProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [loading, setLoading] = useState(true);
   const [numPages, setNumPages] = useState<number | null>(initialNumPages ?? null);
-  const { ref: containerRef, isInView } = useInView<HTMLDivElement>({ rootMargin: "250px 0px" });
-  const [hasRendered, setHasRendered] = useState(false);
+  const handlePageLoaded = useCallback((pages: number) => {
+    setNumPages((prev) => prev ?? pages);
+  }, []);
+
+  const { canvasRef, containerRef, loading } = usePdfThumbnail({
+    file,
+    pageNum: 1,
+    targetWidth: 320,
+    rootMargin: "250px 0px",
+    onPageLoaded: handlePageLoaded,
+  });
 
   useEffect(() => {
     if (initialNumPages !== undefined && initialNumPages !== null) {
       setNumPages(initialNumPages);
     }
   }, [initialNumPages]);
-
-  useEffect(() => {
-    if (!isInView && !hasRendered) return;
-    if (hasRendered) return;
-
-    let active = true;
-    const controller = new AbortController();
-    setLoading(true);
-
-    if (canvasRef.current) {
-      void renderPdfPage(file, canvasRef.current, 1, 320, { signal: controller.signal })
-        .then((res) => {
-          if (!active) return;
-          setLoading(false);
-          if (res) {
-            setHasRendered(true);
-            if (res.numPages) {
-              setNumPages(res.numPages);
-            }
-          }
-        })
-        .catch(() => {
-          if (active) setLoading(false);
-        });
-    }
-
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [file, isInView, hasRendered]);
 
   return (
     <div

@@ -166,7 +166,7 @@ function pumpThumbnailQueue(): void {
       continue;
     }
     activeThumbnailRenders++;
-    next.run().finally(() => {
+    void next.run().finally(() => {
       activeThumbnailRenders--;
       pumpThumbnailQueue();
     });

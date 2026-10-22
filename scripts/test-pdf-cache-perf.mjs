@@ -9,44 +9,48 @@ let getPageCalls = 0;
 let renderCalls = 0;
 let cancelCalls = 0;
 
+function createMockRenderTask(delayMs = 20) {
+  renderCalls++;
+  let cancelled = false;
+  let rejectTask;
+  const promise = new Promise((resolve, reject) => {
+    rejectTask = reject;
+    setTimeout(() => {
+      if (!cancelled) resolve();
+    }, delayMs);
+  });
+
+  return {
+    promise,
+    cancel: () => {
+      cancelled = true;
+      cancelCalls++;
+      const err = new Error("Rendering cancelled");
+      err.name = "RenderingCancelledException";
+      rejectTask?.(err);
+    },
+  };
+}
+
+function createMockPage() {
+  getPageCalls++;
+  return {
+    getViewport: ({ scale = 1 }) => ({
+      width: 200 * scale,
+      height: 200 * scale,
+    }),
+    render: () => createMockRenderTask(20),
+  };
+}
+
 function createMockPdfJs(totalPages = 50) {
   return {
     GlobalWorkerOptions: {},
-    getDocument: (params) => {
+    getDocument: () => {
       getDocumentCalls++;
       const pdfProxy = {
         numPages: totalPages,
-        getPage: async (pageNum) => {
-          getPageCalls++;
-          return {
-            getViewport: ({ scale = 1 }) => ({
-              width: 200 * scale,
-              height: 200 * scale,
-            }),
-            render: ({ canvasContext, viewport }) => {
-              renderCalls++;
-              let cancelled = false;
-              let rejectTask;
-              const promise = new Promise((resolve, reject) => {
-                rejectTask = reject;
-                setTimeout(() => {
-                  if (!cancelled) resolve();
-                }, 20);
-              });
-
-              return {
-                promise,
-                cancel: () => {
-                  cancelled = true;
-                  cancelCalls++;
-                  const err = new Error("Rendering cancelled");
-                  err.name = "RenderingCancelledException";
-                  rejectTask(err);
-                },
-              };
-            },
-          };
-        },
+        getPage: async () => createMockPage(),
         destroy: () => {},
       };
 
@@ -185,7 +189,7 @@ test("PDF caching and rendering performance", async (t) => {
     // Queue 5 thumbnail renders
     for (let i = 1; i <= 5; i++) {
       const canvas = createMockCanvas();
-      renderPdfPage(file, canvas, i, 160).then(() => {
+      void renderPdfPage(file, canvas, i, 160).then(() => {
         order.push(`thumb-${i}`);
       });
     }

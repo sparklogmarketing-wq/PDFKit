@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { renderPdfPage, loadPdfPagesMap } from "../lib/pdfjs";
-import { useInView } from "../lib/useInView";
+import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
@@ -64,33 +64,12 @@ function RotatePageCard({
   readonly onRotateRight: () => void;
   readonly onZoom: () => void;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [loading, setLoading] = useState(true);
-  const { ref: containerRef, isInView } = useInView<HTMLDivElement>({ rootMargin: "300px 0px" });
-  const [hasRendered, setHasRendered] = useState(false);
-
-  useEffect(() => {
-    if (!isInView && !hasRendered) return;
-    if (hasRendered) return;
-    let active = true;
-    const controller = new AbortController();
-    setLoading(true);
-    if (canvasRef.current) {
-      void renderPdfPage(file, canvasRef.current, localPageNum, 260, { signal: controller.signal })
-        .then((res) => {
-          if (!active) return;
-          setLoading(false);
-          if (res) setHasRendered(true);
-        })
-        .catch(() => {
-          if (active) setLoading(false);
-        });
-    }
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [file, localPageNum, isInView, hasRendered]);
+  const { canvasRef, containerRef, loading } = usePdfThumbnail({
+    file,
+    pageNum: localPageNum,
+    targetWidth: 260,
+    rootMargin: "300px 0px",
+  });
 
   const displayAngle = isProtected ? 0 : angle;
   // Scale down when rotated 90/270 so the portrait sheet frame stays intact

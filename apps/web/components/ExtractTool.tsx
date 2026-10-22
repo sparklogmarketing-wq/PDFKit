@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
-import { useInView } from "../lib/useInView";
+import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
@@ -76,33 +76,12 @@ function ExtractPageThumb({
   onToggle,
   onZoom,
 }: ExtractPageThumbProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [loading, setLoading] = useState(true);
-  const { ref: containerRef, isInView } = useInView<HTMLDivElement>({ rootMargin: "300px 0px" });
-  const [hasRendered, setHasRendered] = useState(false);
-
-  useEffect(() => {
-    if (!isInView && !hasRendered) return;
-    if (hasRendered) return;
-    let active = true;
-    const controller = new AbortController();
-    setLoading(true);
-    if (canvasRef.current) {
-      void renderPdfPage(file, canvasRef.current, pageNum, 180, { signal: controller.signal })
-        .then((res) => {
-          if (!active) return;
-          setLoading(false);
-          if (res) setHasRendered(true);
-        })
-        .catch(() => {
-          if (active) setLoading(false);
-        });
-    }
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [file, pageNum, isInView, hasRendered]);
+  const { canvasRef, containerRef, loading } = usePdfThumbnail({
+    file,
+    pageNum,
+    targetWidth: 180,
+    rootMargin: "300px 0px",
+  });
 
   return (
     <div
