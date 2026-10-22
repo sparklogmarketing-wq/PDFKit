@@ -11,6 +11,7 @@ interface PdfZoomModalProps {
   readonly rotation?: number;
   readonly showAngle?: boolean;
   readonly isProtected?: boolean;
+  readonly isRotating?: boolean;
   readonly statusBadgeText?: string;
   readonly statusBadgeVariant?: "warning" | "danger" | "success" | "default";
   readonly extraAction?: React.ReactNode;
@@ -27,6 +28,7 @@ export default function PdfZoomModal({
   rotation = 0,
   showAngle,
   isProtected = false,
+  isRotating = false,
   statusBadgeText,
   statusBadgeVariant = "default",
   extraAction,
@@ -65,15 +67,15 @@ export default function PdfZoomModal({
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         onClose();
-      } else if (e.key === "ArrowLeft" && onRotateLeft && !isProtected) {
+      } else if (e.key === "ArrowLeft" && onRotateLeft && !isProtected && !isRotating) {
         onRotateLeft();
-      } else if (e.key === "ArrowRight" && onRotateRight && !isProtected) {
+      } else if (e.key === "ArrowRight" && onRotateRight && !isProtected && !isRotating) {
         onRotateRight();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, onRotateLeft, onRotateRight, isProtected]);
+  }, [onClose, onRotateLeft, onRotateRight, isProtected, isRotating]);
 
   if (!file) return null;
 
@@ -207,6 +209,7 @@ export default function PdfZoomModal({
                 <button
                   type="button"
                   onClick={onRotateLeft}
+                  disabled={isProtected || isRotating}
                   title="Rotate Left (90° CCW)"
                   aria-label="Rotate page left 90 degrees"
                   style={{
@@ -217,7 +220,8 @@ export default function PdfZoomModal({
                     border: "1px solid var(--border-light)",
                     background: "#ffffff",
                     color: "var(--primary)",
-                    cursor: "pointer",
+                    cursor: (isProtected || isRotating) ? "not-allowed" : "pointer",
+                    opacity: (isProtected || isRotating) ? 0.6 : 1,
                     display: "flex",
                     alignItems: "center",
                     gap: "0.3rem",
@@ -234,6 +238,7 @@ export default function PdfZoomModal({
                 <button
                   type="button"
                   onClick={onRotateRight}
+                  disabled={isProtected || isRotating}
                   title="Rotate Right (90° CW)"
                   aria-label="Rotate page right 90 degrees"
                   style={{
@@ -244,7 +249,8 @@ export default function PdfZoomModal({
                     border: "1px solid var(--border-light)",
                     background: "#ffffff",
                     color: "var(--primary)",
-                    cursor: "pointer",
+                    cursor: (isProtected || isRotating) ? "not-allowed" : "pointer",
+                    opacity: (isProtected || isRotating) ? 0.6 : 1,
                     display: "flex",
                     alignItems: "center",
                     gap: "0.3rem",
@@ -304,10 +310,10 @@ export default function PdfZoomModal({
             boxSizing: "border-box",
           }}
         >
-          {loading && (
+          {(loading || isRotating) && (
             <div className="pdf-modal-loading">
               <div className="spinner" />
-              <span>Rendering preview...</span>
+              <span>{isRotating ? "Rotating document..." : "Rendering preview..."}</span>
             </div>
           )}
 

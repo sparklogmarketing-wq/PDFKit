@@ -355,6 +355,8 @@ export default function MergeTool() {
 
   /* Files State */
   const [files, setFiles] = useState<File[]>([]);
+  const filesRef = useRef(files);
+  filesRef.current = files;
   const [filePagesMap, setFilePagesMap] = useState<Record<string, number>>({});
   const [outputFileName, setOutputFileName] = useState("merged.pdf");
 
@@ -450,26 +452,32 @@ export default function MergeTool() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  /* ── Single Document Rotation (90° clockwise) ───────────── */
+  /* ── Single Document Rotation (90° clockwise or 270° counter-clockwise) ── */
   async function handleRotateFile(index: number, deg = 90) {
-    const file = files[index];
+    const currentFiles = filesRef.current;
+    const file = currentFiles[index];
     if (!file || rotatingIdx !== null) return;
     setRotatingIdx(index);
     try {
       const data = new Uint8Array(await file.arrayBuffer());
       const job = runTool("rotate", [{ name: file.name, data }], { degrees: deg }, () => {});
       const [out] = await job.promise;
-      const rotatedFile = new File([out.data as BlobPart], file.name, { type: file.type || "application/pdf" });
-
-      setFiles((prev) => {
-        const next = [...prev];
-        next[index] = rotatedFile;
-        return next;
+      const rotatedFile = new File([out.data as BlobPart], file.name, {
+        type: file.type || "application/pdf",
+        lastModified: Date.now(),
       });
 
-      if (zoomTarget?.index === index) {
-        setZoomTarget({ file: rotatedFile, index });
-      }
+      const next = [...filesRef.current];
+      next[index] = rotatedFile;
+      filesRef.current = next;
+      setFiles(next);
+
+      setZoomTarget((prev) => {
+        if (prev?.index === index) {
+          return { file: rotatedFile, index };
+        }
+        return prev;
+      });
     } catch (err: unknown) {
       if (!isCancelledError(err)) {
         const msg = err instanceof Error ? err.message : "Unknown error";
@@ -656,6 +664,7 @@ export default function MergeTool() {
           file={zoomTarget.file}
           pageNum={1}
           showAngle={false}
+          isRotating={rotatingIdx === zoomTarget.index}
           onRotateLeft={() => { void handleRotateFile(zoomTarget.index, 270); }}
           onRotateRight={() => { void handleRotateFile(zoomTarget.index, 90); }}
           onClose={() => setZoomTarget(null)}

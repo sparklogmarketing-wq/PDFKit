@@ -26,6 +26,7 @@ export function usePdfThumbnail({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
   const [hasRendered, setHasRendered] = useState(false);
+  const renderedTargetRef = useRef<{ file: File; pageNum: number; targetWidth: number } | null>(null);
   const { ref: containerRef, isInView } = useInView<HTMLDivElement>({ rootMargin });
 
   useEffect(() => {
@@ -33,8 +34,14 @@ export function usePdfThumbnail({
       setLoading(false);
       return;
     }
-    if (!isInView && !hasRendered) return;
-    if (hasRendered) return;
+
+    const isCurrentTargetRendered =
+      renderedTargetRef.current?.file === file &&
+      renderedTargetRef.current?.pageNum === pageNum &&
+      renderedTargetRef.current?.targetWidth === targetWidth;
+
+    if (!isInView && !isCurrentTargetRendered) return;
+    if (isCurrentTargetRendered) return;
 
     let active = true;
     const controller = new AbortController();
@@ -49,6 +56,7 @@ export function usePdfThumbnail({
           if (!active) return;
           setLoading(false);
           if (res) {
+            renderedTargetRef.current = { file, pageNum, targetWidth };
             setHasRendered(true);
             if (res.numPages) {
               onPageLoaded?.(res.numPages);
@@ -64,7 +72,7 @@ export function usePdfThumbnail({
       active = false;
       controller.abort();
     };
-  }, [file, pageNum, targetWidth, enabled, isInView, hasRendered, priority, onPageLoaded]);
+  }, [file, pageNum, targetWidth, enabled, isInView, priority, onPageLoaded]);
 
   return {
     canvasRef,
