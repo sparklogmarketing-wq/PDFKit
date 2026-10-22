@@ -17,6 +17,7 @@
     "@pdfkit/mod-split": "*",
     "jszip": "^3.10.2",
     "next": "^15.0.0",
+    "pdfjs-dist": "^4.10.38",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

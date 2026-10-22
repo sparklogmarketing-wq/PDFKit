@@ -1,5 +1,12 @@
 let pdfjsPromise: Promise<any> | null = null;
 
+export function resetPdfJs(): void {
+  pdfjsPromise = null;
+  if (typeof window !== "undefined") {
+    delete (window as any).pdfjsLib;
+  }
+}
+
 export function getPdfJs(): Promise<any> {
   if (typeof window === "undefined") {
     return Promise.reject(new Error("PDF.js can only be loaded in the browser"));
@@ -8,39 +15,43 @@ export function getPdfJs(): Promise<any> {
     return Promise.resolve((window as any).pdfjsLib);
   }
   if (!pdfjsPromise) {
-    pdfjsPromise = new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = "/vendor/pdf.min.js";
-      script.async = true;
-      script.onload = () => {
-        const lib = (window as any).pdfjsLib;
-        if (lib) {
-          lib.GlobalWorkerOptions.workerSrc = "/vendor/pdf.worker.min.js";
-          resolve(lib);
-        } else {
-          reject(new Error("pdfjsLib not defined after loading script"));
+    pdfjsPromise = (async () => {
+      try {
+        let lib: any;
+        try {
+          // Dynamic import of self-hosted ES module in the browser
+          const vendorUrl = "/vendor/pdf.min.mjs";
+          // @ts-ignore - runtime browser path served from public/vendor/
+          lib = await import(/* webpackIgnore: true */ vendorUrl);
+        } catch {
+          // Fallback to script tag if dynamic import is not available
+          lib = await new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.type = "module";
+            script.src = "/vendor/pdf.min.mjs";
+            script.onload = () => {
+              const loaded = (window as any).pdfjsLib;
+              if (loaded) resolve(loaded);
+              else reject(new Error("pdfjsLib not defined after loading script"));
+            };
+            script.onerror = () => reject(new Error("Failed to load /vendor/pdf.min.mjs"));
+            document.head.appendChild(script);
+          });
         }
-      };
-      script.onerror = () => {
-        // Fallback to CDN if local script fails
-        const cdnScript = document.createElement("script");
-        cdnScript.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-        cdnScript.async = true;
-        cdnScript.onload = () => {
-          const lib = (window as any).pdfjsLib;
-          if (lib) {
-            lib.GlobalWorkerOptions.workerSrc =
-              "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-            resolve(lib);
-          } else {
-            reject(new Error("pdfjsLib not found on CDN"));
-          }
-        };
-        cdnScript.onerror = reject;
-        document.head.appendChild(cdnScript);
-      };
-      document.head.appendChild(script);
-    });
+
+        const resolvedLib = (window as any).pdfjsLib || lib?.default || lib;
+        if (!resolvedLib) {
+          throw new Error("PDF.js library could not be loaded");
+        }
+        resolvedLib.GlobalWorkerOptions.workerSrc = "/vendor/pdf.worker.min.mjs";
+        (window as any).pdfjsLib = resolvedLib;
+        return resolvedLib;
+      } catch (err) {
+        // Reset cached promise so subsequent attempts can retry
+        pdfjsPromise = null;
+        throw err;
+      }
+    })();
   }
   return pdfjsPromise;
 }
@@ -50,7 +61,10 @@ export async function getPdfInfo(file: File): Promise<{ numPages: number } | nul
   try {
     const pdfjs = await getPdfJs();
     const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) });
+    const loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(arrayBuffer),
+      isEvalSupported: false,
+    });
     const pdf = await loadingTask.promise;
     const numPages = pdf.numPages;
     if (typeof pdf.destroy === "function") {
@@ -94,7 +108,10 @@ export async function renderPdfPage(
     try {
       const pdfjs = await getPdfJs();
       const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) });
+      const loadingTask = pdfjs.getDocument({
+        data: new Uint8Array(arrayBuffer),
+        isEvalSupported: false,
+      });
       pdf = await loadingTask.promise;
       const numPages = pdf.numPages;
       const page = await pdf.getPage(Math.min(pageNumber, numPages));
