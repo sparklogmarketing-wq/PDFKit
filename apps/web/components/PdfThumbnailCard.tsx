@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { renderPdfPage } from "../lib/pdfjs";
+import { useInView } from "../lib/useInView";
 import { formatBytes, formatPageCount } from "../lib/format";
 
 interface PdfThumbnailCardProps {
@@ -44,31 +45,33 @@ export default function PdfThumbnailCard({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
   const [numPages, setNumPages] = useState<number | null>(initialNumPages ?? null);
+  const { ref: containerRef, isInView } = useInView<HTMLDivElement>({ rootMargin: "250px 0px" });
+  const [hasRendered, setHasRendered] = useState(false);
 
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-
     if (initialNumPages !== undefined && initialNumPages !== null) {
       setNumPages(initialNumPages);
-    } else {
-      getPdfInfo(file)
-        .then((info) => {
-          if (!active) return;
-          if (info?.numPages) {
-            setNumPages(info.numPages);
-          }
-        })
-        .catch(() => {});
     }
+  }, [initialNumPages]);
+
+  useEffect(() => {
+    if (!isInView && !hasRendered) return;
+    if (hasRendered) return;
+
+    let active = true;
+    const controller = new AbortController();
+    setLoading(true);
 
     if (canvasRef.current) {
-      void renderPdfPage(file, canvasRef.current, 1, 320)
+      void renderPdfPage(file, canvasRef.current, 1, 320, { signal: controller.signal })
         .then((res) => {
           if (!active) return;
           setLoading(false);
-          if (res?.numPages) {
-            setNumPages(res.numPages);
+          if (res) {
+            setHasRendered(true);
+            if (res.numPages) {
+              setNumPages(res.numPages);
+            }
           }
         })
         .catch(() => {
@@ -78,11 +81,13 @@ export default function PdfThumbnailCard({
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [file, initialNumPages]);
+  }, [file, isInView, hasRendered]);
 
   return (
     <div
+      ref={containerRef}
       className={`pdf-thumb-card ${isDragging ? "dragging" : ""} ${
         isDropTarget ? "drop-target" : ""
       }`}

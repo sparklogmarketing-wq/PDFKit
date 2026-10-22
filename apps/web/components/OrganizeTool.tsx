@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { useInView } from "../lib/useInView";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { formatBytes } from "../lib/formatBytes";
 import PdfZoomModal from "./PdfZoomModal";
@@ -88,17 +89,25 @@ function OrganizePageCard({
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const { ref: containerRef, isInView } = useInView<HTMLDivElement>({ rootMargin: "300px 0px" });
+  const [hasRendered, setHasRendered] = useState(false);
+
   useEffect(() => {
     if (item.isBlank || !file) {
       setLoading(false);
       return;
     }
+    if (!isInView && !hasRendered) return;
+    if (hasRendered) return;
     let active = true;
+    const controller = new AbortController();
     setLoading(true);
     if (canvasRef.current) {
-      void renderPdfPage(file, canvasRef.current, item.pageIndex + 1, 180)
-        .then(() => {
-          if (active) setLoading(false);
+      void renderPdfPage(file, canvasRef.current, item.pageIndex + 1, 180, { signal: controller.signal })
+        .then((res) => {
+          if (!active) return;
+          setLoading(false);
+          if (res) setHasRendered(true);
         })
         .catch(() => {
           if (active) setLoading(false);
@@ -106,8 +115,9 @@ function OrganizePageCard({
     }
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [file, item.pageIndex, item.isBlank]);
+  }, [file, item.pageIndex, item.isBlank, isInView, hasRendered]);
 
   const cardBorder = theme?.border || "#cbd5e1";
 

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { useInView } from "../lib/useInView";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import PdfZoomModal from "./PdfZoomModal";
@@ -176,20 +177,35 @@ function SelectablePageCard({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
+  const { ref: containerRef, isInView } = useInView<HTMLDivElement>({ rootMargin: "300px 0px" });
+  const [hasRendered, setHasRendered] = useState(false);
 
   useEffect(() => {
+    if (!isInView && !hasRendered) return;
+    if (hasRendered) return;
     let active = true;
+    const controller = new AbortController();
     setLoading(true);
     if (canvasRef.current) {
-      renderPdfPage(file, canvasRef.current, pageNum, 160).then(() => {
-        if (active) setLoading(false);
-      });
+      renderPdfPage(file, canvasRef.current, pageNum, 160, { signal: controller.signal })
+        .then((res) => {
+          if (!active) return;
+          setLoading(false);
+          if (res) setHasRendered(true);
+        })
+        .catch(() => {
+          if (active) setLoading(false);
+        });
     }
-    return () => { active = false; };
-  }, [file, pageNum]);
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [file, pageNum, isInView, hasRendered]);
 
   return (
     <div
+      ref={containerRef}
       className={`split-page-thumb ${isSelected ? "selected" : ""}`}
       onClick={() => onToggle(pageNum)}
     >
@@ -245,12 +261,20 @@ function SingleDocumentPreview({ file, onZoom }: { file: File; onZoom: () => voi
   useEffect(() => {
     let active = true;
     setLoading(true);
+    const controller = new AbortController();
     if (canvasRef.current) {
-      renderPdfPage(file, canvasRef.current, 1, 260).then(() => {
-        if (active) setLoading(false);
-      });
+      renderPdfPage(file, canvasRef.current, 1, 260, { signal: controller.signal })
+        .then(() => {
+          if (active) setLoading(false);
+        })
+        .catch(() => {
+          if (active) setLoading(false);
+        });
     }
-    return () => { active = false; };
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [file]);
 
   return (

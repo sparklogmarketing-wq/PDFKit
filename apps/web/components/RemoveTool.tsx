@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { useInView } from "../lib/useInView";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { formatBytes, formatPagesToRangeString } from "../lib/format";
 import { parsePageSpec } from "@pdfkit/core";
@@ -27,26 +28,37 @@ function RemovePageThumbnailCard({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
+  const { ref: containerRef, isInView } = useInView<HTMLDivElement>({ rootMargin: "300px 0px" });
+  const [hasRendered, setHasRendered] = useState(false);
 
   useEffect(() => {
+    if (!isInView && !hasRendered) return;
+    if (hasRendered) return;
     let active = true;
+    const controller = new AbortController();
     setLoading(true);
 
     if (canvasRef.current) {
-      renderPdfPage(file, canvasRef.current, pageNum, 280)
-        .catch(() => {})
-        .finally(() => {
+      renderPdfPage(file, canvasRef.current, pageNum, 280, { signal: controller.signal })
+        .then((res) => {
+          if (!active) return;
+          setLoading(false);
+          if (res) setHasRendered(true);
+        })
+        .catch(() => {
           if (active) setLoading(false);
         });
     }
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [file, pageNum]);
+  }, [file, pageNum, isInView, hasRendered]);
 
   return (
     <div
+      ref={containerRef}
       role="button"
       tabIndex={0}
       onClick={() => onToggleDelete(pageNum)}

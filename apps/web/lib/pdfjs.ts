@@ -1,7 +1,29 @@
 let pdfjsPromise: Promise<any> | null = null;
+let documentCache = new WeakMap<File, Promise<any>>();
+let pageCountCache = new WeakMap<File, number>();
+
+export interface RenderPdfPageOptions {
+  /**
+   * If true, the render bypasses the thumbnail queue and executes immediately
+   * (e.g. for Zoom modal interactions).
+   */
+  priority?: boolean;
+  /**
+   * Optional AbortSignal to cancel rendering if the component unmounts
+   * or scrolls out of view.
+   */
+  signal?: AbortSignal;
+}
+
+export function clearPdfDocumentCache(): void {
+  documentCache = new WeakMap<File, Promise<any>>();
+  pageCountCache = new WeakMap<File, number>();
+  thumbnailQueue.length = 0;
+}
 
 export function resetPdfJs(): void {
   pdfjsPromise = null;
+  clearPdfDocumentCache();
   if (typeof window !== "undefined") {
     delete (window as any).pdfjsLib;
   }
@@ -56,9 +78,17 @@ export function getPdfJs(): Promise<any> {
   return pdfjsPromise;
 }
 
-/** Quickly extract number of pages without full page rendering */
-export async function getPdfInfo(file: File): Promise<{ numPages: number } | null> {
-  try {
+/**
+ * Retrieves or caches a single parsed PDFDocumentProxy per File.
+ * Subsequent calls for the same File return the exact same promise.
+ */
+export function getOrLoadPdfDocument(file: File): Promise<any> {
+  const cached = documentCache.get(file);
+  if (cached) {
+    return cached;
+  }
+
+  const promise = (async () => {
     const pdfjs = await getPdfJs();
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjs.getDocument({
@@ -66,13 +96,36 @@ export async function getPdfInfo(file: File): Promise<{ numPages: number } | nul
       isEvalSupported: false,
     });
     const pdf = await loadingTask.promise;
-    const numPages = pdf.numPages;
-    if (typeof pdf.destroy === "function") {
-      try {
-        pdf.destroy();
-      } catch (_) {}
+    pageCountCache.set(file, pdf.numPages);
+    return pdf;
+  })().catch((err) => {
+    documentCache.delete(file);
+    throw err;
+  });
+
+  documentCache.set(file, promise);
+  return promise;
+}
+
+/** Direct uncached document loader for isolated operations if needed */
+export async function loadPdfDocumentDirect(data: Uint8Array): Promise<any> {
+  const pdfjs = await getPdfJs();
+  const loadingTask = pdfjs.getDocument({
+    data,
+    isEvalSupported: false,
+  });
+  return await loadingTask.promise;
+}
+
+/** Quickly extract number of pages from cached document without duplicate parses */
+export async function getPdfInfo(file: File): Promise<{ numPages: number } | null> {
+  try {
+    const cachedCount = pageCountCache.get(file);
+    if (typeof cachedCount === "number") {
+      return { numPages: cachedCount };
     }
-    return { numPages };
+    const pdf = await getOrLoadPdfDocument(file);
+    return { numPages: pdf.numPages };
   } catch (err) {
     console.error("Failed to get PDF info:", err);
     return null;
@@ -94,67 +147,168 @@ export async function loadPdfPagesMap(
   return updated;
 }
 
-// Queue sequential renders so parallel worker canvas operations never collide or invert
-let renderQueue: Promise<any> = Promise.resolve();
+/* ── Priority-Aware Throttled Render Scheduler ───────────────── */
 
+interface QueuedRender {
+  signal?: AbortSignal;
+  run: () => Promise<void>;
+  reject: (err: any) => void;
+}
+
+let activeThumbnailRenders = 0;
+const MAX_CONCURRENT_THUMBNAILS = 2;
+const thumbnailQueue: QueuedRender[] = [];
+
+function pumpThumbnailQueue(): void {
+  while (activeThumbnailRenders < MAX_CONCURRENT_THUMBNAILS && thumbnailQueue.length > 0) {
+    const next = thumbnailQueue.shift()!;
+    if (next.signal?.aborted) {
+      continue;
+    }
+    activeThumbnailRenders++;
+    next.run().finally(() => {
+      activeThumbnailRenders--;
+      pumpThumbnailQueue();
+    });
+  }
+}
+
+async function executeRender(
+  file: File,
+  canvas: HTMLCanvasElement,
+  pageNumber: number,
+  targetWidth: number,
+  signal?: AbortSignal
+): Promise<{ numPages: number } | null> {
+  if (signal?.aborted) {
+    return null;
+  }
+
+  try {
+    const pdf = await getOrLoadPdfDocument(file);
+    if (signal?.aborted) {
+      return null;
+    }
+
+    const numPages = pdf.numPages;
+    const page = await pdf.getPage(Math.min(pageNumber, numPages));
+    if (signal?.aborted) {
+      return null;
+    }
+
+    const initialViewport = page.getViewport({ scale: 1 });
+    const scale = targetWidth / initialViewport.width;
+    const viewport = page.getViewport({ scale });
+
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return { numPages };
+
+    // Ensure transform is clean identity and background is clean white
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const renderTask = page.render({
+      canvasContext: ctx,
+      viewport,
+    });
+
+    if (signal) {
+      if (signal.aborted) {
+        try {
+          renderTask.cancel();
+        } catch (_) {}
+        return null;
+      }
+      signal.addEventListener(
+        "abort",
+        () => {
+          try {
+            renderTask.cancel();
+          } catch (_) {}
+        },
+        { once: true }
+      );
+    }
+
+    await renderTask.promise;
+
+    // Reset transform after rendering
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    return { numPages };
+  } catch (err: any) {
+    if (err?.name === "RenderingCancelledException" || signal?.aborted) {
+      return null;
+    }
+    console.error("Failed to render PDF page:", err);
+    return null;
+  }
+}
+
+/**
+ * Renders a PDF page to a canvas.
+ * - Reuses the cached PDFDocumentProxy for the File.
+ * - Zoom modal renders (`priority: true`) run immediately without waiting behind thumbnails.
+ * - Background thumbnail renders are throttled and support abort cancellation on unmount/scroll.
+ */
 export async function renderPdfPage(
   file: File,
   canvas: HTMLCanvasElement,
   pageNumber = 1,
-  targetWidth = 360
+  targetWidth = 360,
+  options?: RenderPdfPageOptions
 ): Promise<{ numPages: number } | null> {
-  const doRender = async () => {
-    let pdf: any = null;
-    try {
-      const pdfjs = await getPdfJs();
-      const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjs.getDocument({
-        data: new Uint8Array(arrayBuffer),
-        isEvalSupported: false,
-      });
-      pdf = await loadingTask.promise;
-      const numPages = pdf.numPages;
-      const page = await pdf.getPage(Math.min(pageNumber, numPages));
+  const signal = options?.signal;
+  const isPriority = options?.priority === true;
 
-      const initialViewport = page.getViewport({ scale: 1 });
-      const scale = targetWidth / initialViewport.width;
-      const viewport = page.getViewport({ scale });
+  if (signal?.aborted) {
+    return null;
+  }
 
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+  // Priority renders (e.g. Zoom modal) run immediately without waiting in thumbnail queue
+  if (isPriority) {
+    return executeRender(file, canvas, pageNumber, targetWidth, signal);
+  }
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return { numPages };
+  // Thumbnail renders are queued and throttled
+  return new Promise<{ numPages: number } | null>((resolve, reject) => {
+    let executed = false;
 
-      // Ensure transform is clean identity and background is clean white
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const renderTask = page.render({
-        canvasContext: ctx,
-        viewport,
-      });
-
-      await renderTask.promise;
-
-      // Reset transform after rendering
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-      return { numPages };
-    } catch (err) {
-      console.error("Failed to render PDF page:", err);
-      return null;
-    } finally {
-      if (pdf && typeof pdf.destroy === "function") {
+    const task: QueuedRender = {
+      signal,
+      run: async () => {
+        executed = true;
         try {
-          pdf.destroy();
-        } catch (_) {}
-      }
-    }
-  };
+          const res = await executeRender(file, canvas, pageNumber, targetWidth, signal);
+          resolve(res);
+        } catch (err) {
+          reject(err);
+        }
+      },
+      reject,
+    };
 
-  const p = renderQueue.then(doRender, doRender);
-  renderQueue = p.catch(() => {});
-  return p;
+    if (signal) {
+      signal.addEventListener(
+        "abort",
+        () => {
+          if (!executed) {
+            const idx = thumbnailQueue.indexOf(task);
+            if (idx !== -1) {
+              thumbnailQueue.splice(idx, 1);
+            }
+            resolve(null);
+          }
+        },
+        { once: true }
+      );
+    }
+
+    thumbnailQueue.push(task);
+    pumpThumbnailQueue();
+  });
 }

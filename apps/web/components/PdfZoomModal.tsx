@@ -37,18 +37,27 @@ export default function PdfZoomModal({
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const renderPage = useCallback(async () => {
+  const renderPage = useCallback(async (signal?: AbortSignal) => {
     if (!file || !canvasRef.current) return;
     setLoading(true);
     try {
-      await renderPdfPage(file, canvasRef.current, pageNum, 1100);
+      await renderPdfPage(file, canvasRef.current, pageNum, 1100, {
+        priority: true,
+        signal,
+      });
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, [file, pageNum]);
 
   useEffect(() => {
-    void renderPage();
+    const controller = new AbortController();
+    void renderPage(controller.signal);
+    return () => {
+      controller.abort();
+    };
   }, [renderPage]);
 
   // Keyboard navigation: Escape to close, Left/Right arrows to rotate
