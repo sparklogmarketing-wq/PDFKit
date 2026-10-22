@@ -1,6 +1,5 @@
 {
-  "outputDirectory": "apps/web/out",
-  "cleanUrls": true,
+  "outputDirectory": "apps/web/.next",
   "headers": [
     {
       "source": "/(.*)",
