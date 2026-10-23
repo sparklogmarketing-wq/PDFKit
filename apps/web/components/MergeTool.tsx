@@ -380,6 +380,8 @@ export default function MergeTool() {
 
   const cancelRef = useRef<(() => void) | null>(null);
   cancelRef.current = cancel;
+  const loadIdRef = useRef(0);
+  const runIdRef = useRef(0);
 
   /* Cleanup object URLs and cancel running worker on unmount */
   useEffect(() => {
@@ -403,6 +405,15 @@ export default function MergeTool() {
       return;
     }
 
+    if (!append) {
+      cancelRef.current?.();
+      setCancel(null);
+      setProgress(null);
+      setStatusMessage("");
+      runIdRef.current++;
+    }
+    const loadId = ++loadIdRef.current;
+
     setError("");
     setResults([]);
     setProgress(null);
@@ -411,6 +422,7 @@ export default function MergeTool() {
     setFiles(updated);
 
     const newPages = await loadPdfPagesMap(pdfs, filePagesMap);
+    if (loadId !== loadIdRef.current) return;
     setFilePagesMap(newPages);
   }
 
@@ -445,6 +457,12 @@ export default function MergeTool() {
   }
 
   function clearAllFiles() {
+    cancelRef.current?.();
+    loadIdRef.current++;
+    runIdRef.current++;
+    setCancel(null);
+    setProgress(null);
+    setStatusMessage("");
     setFiles([]);
     setFilePagesMap({});
     setResults([]);
@@ -529,6 +547,7 @@ export default function MergeTool() {
   /* ── Process & Run Merge ─────────────────────────────────── */
   async function handleMergeSubmit() {
     if (files.length < 2 || isRunning) return;
+    const runId = ++runIdRef.current;
     setError("");
     setProgress(0);
     setStatusMessage("Preparing files for merging...");
@@ -540,16 +559,20 @@ export default function MergeTool() {
           data: new Uint8Array(await f.arrayBuffer()),
         }))
       );
+      if (runId !== runIdRef.current) return;
 
       setStatusMessage(`Merging ${files.length} PDFs...`);
 
       const job = runTool("merge", inputs, {}, (p) => {
-        setProgress(p);
-        setStatusMessage(`Merging documents... ${Math.round(p * 100)}%`);
+        if (runId === runIdRef.current) {
+          setProgress(p);
+          setStatusMessage(`Merging documents... ${Math.round(p * 100)}%`);
+        }
       });
 
       setCancel(() => job.cancel);
       const outputs: OutputFile[] = await job.promise;
+      if (runId !== runIdRef.current || files.length === 0) return;
 
       const finalName = resolveMergedFileName(outputFileName);
 
@@ -564,20 +587,22 @@ export default function MergeTool() {
 
       setResults(res);
     } catch (err: unknown) {
-      if (!isCancelledError(err)) {
+      if (runId === runIdRef.current && !isCancelledError(err)) {
         const msg = err instanceof Error ? err.message : "An error occurred during merging.";
         console.error("Merge error:", err);
         setError(msg);
       }
     } finally {
-      setProgress(null);
-      setStatusMessage("");
-      setCancel(null);
+      if (runId === runIdRef.current) {
+        setProgress(null);
+        setStatusMessage("");
+        setCancel(null);
+      }
     }
   }
 
   /* ── RENDER: Results View ────────────────────────────────── */
-  if (results.length > 0) {
+  if (results.length > 0 && files.length > 0) {
     return (
       <ToolResultsView
         title="PDFs Merged Successfully!"
