@@ -382,11 +382,18 @@ export default function SplitTool() {
   const [error, setError] = useState("");
   const [results, setResults] = useState<{ name: string; url: string; size: number }[]>([]);
   const [cancel, setCancel] = useState<(() => void) | null>(null);
+  const cancelRef = useRef<(() => void) | null>(null);
+  cancelRef.current = cancel;
+  const loadIdRef = useRef(0);
+  const runIdRef = useRef(0);
   const [isZipping, setIsZipping] = useState(false);
   const isRunning = progress !== null;
 
-  /* cleanup urls on unmount */
-  useEffect(() => () => { results.forEach((r) => URL.revokeObjectURL(r.url)); }, [results]);
+  /* cleanup urls and cancel active job on unmount */
+  useEffect(() => () => {
+    cancelRef.current?.();
+    results.forEach((r) => URL.revokeObjectURL(r.url));
+  }, [results]);
 
   async function handleDownloadAllZip() {
     if (results.length === 0 || isZipping) return;
@@ -408,11 +415,20 @@ export default function SplitTool() {
       setError("Please select a PDF file.");
       return;
     }
+    cancelRef.current?.();
+    setCancel(null);
+    runIdRef.current++;
+    const loadId = ++loadIdRef.current;
+
     setError("");
     setResults([]);
-    setFile(f);
     setProgress(null);
+    setStatusMsg("");
+
     const info = await getPdfInfo(f);
+    if (loadId !== loadIdRef.current) return;
+
+    setFile(f);
     const n = info?.numPages ?? 0;
     setTotalPages(n);
     setRanges([{ id: 1, from: 1, to: n || 1 }]);
@@ -631,14 +647,19 @@ export default function SplitTool() {
       }
     }
 
+    const runId = ++runIdRef.current;
     try {
       const data = new Uint8Array(await file.arrayBuffer());
+      if (runId !== runIdRef.current) return;
       const job = runTool("split", [{ name: file.name, data }], effectiveOpts, (p) => {
-        setProgress(Math.max(0.1, p));
-        setStatusMsg(`Processing (${Math.round(p * 100)}%)…`);
+        if (runId === runIdRef.current) {
+          setProgress(Math.max(0.1, p));
+          setStatusMsg(`Processing (${Math.round(p * 100)}%)…`);
+        }
       });
       setCancel(() => () => job.cancel());
       const outputs: OutputFile[] = await job.promise;
+      if (runId !== runIdRef.current || !file) return;
 
       const mapped = outputs.map((o) => ({
         name: o.name,
@@ -647,17 +668,22 @@ export default function SplitTool() {
       }));
       setResults(mapped);
     } catch (err: any) {
-      if (!isCancelledError(err)) {
+      if (runId === runIdRef.current && !isCancelledError(err)) {
         setError(err?.message ?? "An error occurred.");
       }
     } finally {
-      setProgress(null);
-      setStatusMsg("");
-      setCancel(null);
+      if (runId === runIdRef.current) {
+        setProgress(null);
+        setStatusMsg("");
+        setCancel(null);
+      }
     }
   }
 
   function reset() {
+    cancelRef.current?.();
+    loadIdRef.current++;
+    runIdRef.current++;
     setFile(null);
     setTotalPages(0);
     setRanges([{ id: 1, from: 1, to: 1 }]);
@@ -670,6 +696,7 @@ export default function SplitTool() {
     setResults([]);
     setError("");
     setProgress(null);
+    setStatusMsg("");
     setCancel(null);
   }
 
@@ -733,7 +760,7 @@ export default function SplitTool() {
   }
 
   /* ── Render: Results ─────────────────────────────────────── */
-  if (results.length > 0) {
+  if (results.length > 0 && file) {
     return (
       <div className="split-tool-wrap">
         <div

@@ -182,11 +182,16 @@ export default function ExtractTool() {
   const [cancelTask, setCancelTask] = useState<(() => void) | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cancelTaskRef = useRef<(() => void) | null>(null);
+  cancelTaskRef.current = cancelTask;
+  const loadIdRef = useRef(0);
+  const runIdRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
 
-  /* Cleanup object URLs when results change or unmount */
+  /* Cleanup object URLs when results change or unmount and cancel active run */
   useEffect(() => {
     return () => {
+      cancelTaskRef.current?.();
       if (results) {
         results.forEach((r) => URL.revokeObjectURL(r.url));
       }
@@ -195,10 +200,18 @@ export default function ExtractTool() {
 
   /* Handle PDF file selection */
   const loadPdfFile = useCallback(async (selectedFile: File) => {
+    cancelTaskRef.current?.();
+    setCancelTask(null);
+    setIsRunning(false);
+    setProgress(null);
+    runIdRef.current++;
+    const loadId = ++loadIdRef.current;
+
     setError(null);
     setResults(null);
     try {
       const info = await getPdfInfo(selectedFile);
+      if (loadId !== loadIdRef.current) return;
       if (!info || info.numPages <= 0) {
         setError("The selected PDF file has no pages or could not be read.");
         return;
@@ -218,6 +231,7 @@ export default function ExtractTool() {
       setMergeAll(true);
       setOutputName("");
     } catch (err: any) {
+      if (loadId !== loadIdRef.current) return;
       setError(err?.message || "Failed to load PDF file.");
     }
   }, []);
@@ -269,12 +283,14 @@ export default function ExtractTool() {
       return;
     }
 
+    const runId = ++runIdRef.current;
     setIsRunning(true);
     setProgress(0);
     setError(null);
 
     try {
       const buf = await file.arrayBuffer();
+      if (runId !== runIdRef.current) return;
       const inputData = new Uint8Array(buf);
 
       // Convert 1-based page numbers to 0-based for module
@@ -292,11 +308,14 @@ export default function ExtractTool() {
           mergeAll,
           outputName: outputName.trim() || undefined,
         },
-        (p) => setProgress(p)
+        (p) => {
+          if (runId === runIdRef.current) setProgress(p);
+        }
       );
 
       setCancelTask(() => runner.cancel);
       const outputs = await runner.promise;
+      if (runId !== runIdRef.current || !file) return;
 
       const outputFiles = outputs.map((out: OutputFile) => ({
         name: out.name,
@@ -306,13 +325,15 @@ export default function ExtractTool() {
 
       setResults(outputFiles);
     } catch (err: any) {
-      if (!isCancelledError(err)) {
+      if (runId === runIdRef.current && !isCancelledError(err)) {
         setError(err?.message || "Failed to extract pages.");
       }
     } finally {
-      setIsRunning(false);
-      setProgress(null);
-      setCancelTask(null);
+      if (runId === runIdRef.current) {
+        setIsRunning(false);
+        setProgress(null);
+        setCancelTask(null);
+      }
     }
   }, [file, totalPages, extractMode, selectedPages, mergeAll, outputName]);
 
@@ -330,12 +351,19 @@ export default function ExtractTool() {
   }, [results, isZipping, file]);
 
   const handleReset = useCallback(() => {
+    loadIdRef.current++;
+    runIdRef.current++;
+    cancelTaskRef.current?.();
+    setCancelTask(null);
+    setIsRunning(false);
+    setProgress(null);
     setFile(null);
     setTotalPages(0);
     setSelectedPages(new Set());
     setPagesInput("");
     setResults(null);
     setError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
 
   /* ── 1. Upload View ───────────────────────────────────────── */
@@ -411,7 +439,7 @@ export default function ExtractTool() {
   }
 
   /* ── 2. Results View ──────────────────────────────────────── */
-  if (results) {
+  if (results && file) {
     const isSingle = results.length === 1;
     return (
       <div className="tool-runner-panel" style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
