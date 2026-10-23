@@ -7,6 +7,26 @@ function getLatestWorker() {
   return globalThis.Worker.instances.at(-1);
 }
 
+// Module-scope mock helpers for async PDF info & page map resolution
+async function mockDelayedPdfInfo(file) {
+  if (file?.name === "slow.pdf") {
+    await new Promise((r) => setTimeout(r, 60));
+    return { numPages: 100 };
+  }
+  if (file?.name === "pending.pdf") {
+    await new Promise((r) => setTimeout(r, 30));
+    return { numPages: 42 };
+  }
+  // fast.pdf or default
+  await new Promise((r) => setTimeout(r, 10));
+  return { numPages: 5 };
+}
+
+async function mockDelayedPagesMap(files) {
+  await new Promise((r) => setTimeout(r, 40));
+  return { [files[0].name]: 15 };
+}
+
 // ─────────────────────────────────────────────────────────────
 // 1. Generic ToolRunner: reset-during-run & rapid replacement
 // ─────────────────────────────────────────────────────────────
@@ -92,7 +112,7 @@ test("Generic ToolRunner: stale async and reset protection", async (t) => {
 
     // 4. Assert results were NOT populated and results view would not render
     assert.equal(results.length, 0, "Stale results must be discarded");
-    const shouldRenderResults = results.length > 0 && files.length > 0;
+    const shouldRenderResults = Boolean(results.length > 0 && files.length > 0);
     assert.equal(shouldRenderResults, false, "Results view must not render without source files");
   });
 
@@ -238,7 +258,8 @@ test("Custom Tools: SplitTool and ExtractTool async lifecycle", async (t) => {
 
     await splitPromise;
     assert.equal(results.length, 0, "No results after reset");
-    assert.equal(results.length > 0 && file !== null, false, "Results view guarded by file presence");
+    const shouldRenderResults = Boolean(results.length > 0 && file);
+    assert.equal(shouldRenderResults, false, "Results view guarded by file presence");
   });
 
   await t.test("SplitTool & ExtractTool: rapid file replacement ignores stale getPdfInfo", async () => {
@@ -246,20 +267,9 @@ test("Custom Tools: SplitTool and ExtractTool async lifecycle", async (t) => {
     let totalPages = 0;
     const loadIdRef = { current: 0 };
 
-    // Simulated getPdfInfo with controllable delays
-    async function mockGetPdfInfo(file) {
-      if (file.name === "slow.pdf") {
-        await new Promise((r) => setTimeout(r, 60));
-        return { numPages: 100 };
-      }
-      // fast.pdf
-      await new Promise((r) => setTimeout(r, 10));
-      return { numPages: 5 };
-    }
-
     async function loadFile(f) {
       const loadId = ++loadIdRef.current;
-      const info = await mockGetPdfInfo(f);
+      const info = await mockDelayedPdfInfo(f);
       if (loadId !== loadIdRef.current) return;
       currentFile = f;
       totalPages = info.numPages;
@@ -280,14 +290,9 @@ test("Custom Tools: SplitTool and ExtractTool async lifecycle", async (t) => {
     let totalPages = 0;
     const loadIdRef = { current: 0 };
 
-    async function mockGetPdfInfo() {
-      await new Promise((r) => setTimeout(r, 30));
-      return { numPages: 42 };
-    }
-
     async function loadFile(f) {
       const loadId = ++loadIdRef.current;
-      const info = await mockGetPdfInfo();
+      const info = await mockDelayedPdfInfo(f);
       if (loadId !== loadIdRef.current) return;
       currentFile = f;
       totalPages = info.numPages;
@@ -368,21 +373,17 @@ test("Multi-file Tools: MergeTool, OrganizeTool, RotateTool stale resolution", a
 
     await mergePromise;
     assert.equal(results.length, 0);
-    assert.equal(results.length > 0 && files.length > 0, false);
+    const shouldRenderResults = Boolean(results.length > 0 && files.length > 0);
+    assert.equal(shouldRenderResults, false);
   });
 
   await t.test("MergeTool & RotateTool: loadPdfPagesMap ignored if cleared during load", async () => {
     let filePagesMap = {};
     const loadIdRef = { current: 0 };
 
-    async function mockLoadPdfPagesMap(files) {
-      await new Promise((r) => setTimeout(r, 40));
-      return { [files[0].name]: 15 };
-    }
-
     async function handleFileSelect(files) {
       const loadId = ++loadIdRef.current;
-      const newPages = await mockLoadPdfPagesMap(files);
+      const newPages = await mockDelayedPagesMap(files);
       if (loadId !== loadIdRef.current) return;
       filePagesMap = newPages;
     }
