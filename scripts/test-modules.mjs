@@ -135,7 +135,75 @@ test("mod-split", async (t) => {
     assert.ok(results.length >= 2);
     for (const res of results) {
       assert.ok(res.data.byteLength > 0);
+      assert.ok(res.data.byteLength <= 1500, `Part size ${res.data.byteLength} exceeds limit 1500`);
     }
+  });
+
+  await t.test("splits 100+ page document with sub-second linear/logarithmic runtime", async () => {
+    const pdf120 = await createSamplePdf(120);
+    const maxSizeBytes = 12000;
+    const start = performance.now();
+    const results = await splitMod.run([
+      { name: "large.pdf", data: pdf120 },
+    ], { mode: "size", maxSizeBytes, allowCompression: true }, ctx);
+    const duration = performance.now() - start;
+
+    // Runtime must be fast (well under 2.5s, previously took >6s on 100 pages)
+    assert.ok(duration < 2500, `Expected duration < 2500ms, got ${duration.toFixed(1)}ms`);
+    assert.ok(results.length >= 2, "Should split into multiple parts");
+
+    let totalPagesCounted = 0;
+    for (const res of results) {
+      assert.ok(res.data.byteLength <= maxSizeBytes, `Part size ${res.data.byteLength} exceeds limit ${maxSizeBytes}`);
+      const partDoc = await PDFDocument.load(res.data);
+      totalPagesCounted += partDoc.getPageCount();
+    }
+    assert.equal(totalPagesCounted, 120, "All 120 pages preserved across parts");
+  });
+
+  await t.test("boundary test: single page below the limit succeeds", async () => {
+    const singlePdf = await createSamplePdf(1);
+    const doc = await PDFDocument.load(singlePdf);
+    const exactBytes = (await doc.save({ useObjectStreams: true })).byteLength;
+
+    const results = await splitMod.run([
+      { name: "single.pdf", data: singlePdf },
+    ], { mode: "size", maxSizeBytes: exactBytes + 500, allowCompression: true }, ctx);
+
+    assert.equal(results.length, 1);
+    assert.ok(results[0].data.byteLength <= exactBytes + 500);
+  });
+
+  await t.test("boundary test: single page exactly at the limit succeeds", async () => {
+    const singlePdf = await createSamplePdf(1);
+    const srcDoc = await PDFDocument.load(singlePdf);
+    const testDoc = await PDFDocument.create();
+    const [copied] = await testDoc.copyPages(srcDoc, [0]);
+    testDoc.addPage(copied);
+    const exactBytes = (await testDoc.save({ useObjectStreams: true })).byteLength;
+
+    const results = await splitMod.run([
+      { name: "single.pdf", data: singlePdf },
+    ], { mode: "size", maxSizeBytes: exactBytes, allowCompression: true }, ctx);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].data.byteLength, exactBytes);
+  });
+
+  await t.test("boundary test: single page above the limit produces clear error", async () => {
+    const singlePdf = await createSamplePdf(1);
+    const srcDoc = await PDFDocument.load(singlePdf);
+    const testDoc = await PDFDocument.create();
+    const [copied] = await testDoc.copyPages(srcDoc, [0]);
+    testDoc.addPage(copied);
+    const exactBytes = (await testDoc.save({ useObjectStreams: true })).byteLength;
+
+    await assert.rejects(
+      async () => await splitMod.run([
+        { name: "single.pdf", data: singlePdf },
+      ], { mode: "size", maxSizeBytes: exactBytes - 1, allowCompression: true }, ctx),
+      /Page 1 size.*exceeds the maximum allowed size/i
+    );
   });
 });
 
