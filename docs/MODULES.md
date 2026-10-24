@@ -33,3 +33,9 @@ Shared (non-tool) packages to add next: `packages/viewer` (pdfjs React viewer), 
 - **Default Size**: `DEFAULT_MAX_SIZE_BYTES = 500000` (500 KB) is shared identically across both `manifest.ts` and module execution (`index.ts`).
 - **Single Page Limit**: When splitting by size, any individual page whose serialized size exceeds `maxSizeBytes` throws a descriptive `ToolError`.
 - **`mergeAll` Invariant**: When `opts.mergeAll: true` is combined with `mode: "size"`, `mergeAll` is validated to ensure it cannot silently exceed the requested `maxSizeBytes`. If merging the parts into a single document produces or requires a file size greater than `maxSizeBytes`, a validation `ToolError` is thrown.
+
+### Organize Module (`packages/mod-organize`)
+- **Blank Page Dimension & Orientation Inheritance**: Blank pages inserted into a document inherit their width, height, and orientation from neighboring pages (or the document) rather than defaulting to hardcoded A4 portrait. Explicit `width` and `height` properties can also be specified on `OrganizePageItem`.
+- **Blank Page Rotation**: Rotation angle (`0, 90, 180, 270`) on blank items is fully preserved and applied to the generated PDF page and UI canvas.
+- **Relative Position Preservation**: Reordering files, sorting (A-Z, Z-A, 1-9, 9-1), interleaving, or removing files/pages preserves inserted blank pages at their relative positions (start, middle, end) via `reinsertBlanksAtRelativePositions`.
+

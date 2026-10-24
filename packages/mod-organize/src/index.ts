@@ -7,6 +7,114 @@ export interface OrganizePageItem {
   pageIndex: number; // 0-indexed
   rotation?: number; // 0, 90, 180, 270 degrees
   isBlank?: boolean;
+  width?: number;
+  height?: number;
+}
+
+export function getInheritedPageDimensions(
+  items: OrganizePageItem[],
+  currentIndex: number,
+  srcDocs: PDFDocument[]
+): [number, number] {
+  const current = items[currentIndex];
+  if (current.width && current.height && current.width > 0 && current.height > 0) {
+    return [current.width, current.height];
+  }
+
+  // 1. Look backwards for the closest non-blank page
+  for (let j = currentIndex - 1; j >= 0; j--) {
+    const it = items[j];
+    if (!it.isBlank) {
+      const fIdx = Number(it.fileIndex);
+      const pIdx = Number(it.pageIndex);
+      if (srcDocs[fIdx] && pIdx >= 0 && pIdx < srcDocs[fIdx].getPageCount()) {
+        const p = srcDocs[fIdx].getPage(pIdx);
+        const { width, height } = p.getSize();
+        return [width, height];
+      }
+    }
+  }
+
+  // 2. Look forwards for the closest non-blank page
+  for (let j = currentIndex + 1; j < items.length; j++) {
+    const it = items[j];
+    if (!it.isBlank) {
+      const fIdx = Number(it.fileIndex);
+      const pIdx = Number(it.pageIndex);
+      if (srcDocs[fIdx] && pIdx >= 0 && pIdx < srcDocs[fIdx].getPageCount()) {
+        const p = srcDocs[fIdx].getPage(pIdx);
+        const { width, height } = p.getSize();
+        return [width, height];
+      }
+    }
+  }
+
+  // 3. Fallback to first page of first document with pages
+  for (const doc of srcDocs) {
+    if (doc.getPageCount() > 0) {
+      const { width, height } = doc.getPage(0).getSize();
+      return [width, height];
+    }
+  }
+
+  // 4. Default standard A4
+  return [595.28, 841.89];
+}
+
+export function reinsertBlanksAtRelativePositions<T extends { isBlank?: boolean }>(
+  originalItems: T[],
+  reorderedNonBlanks: T[]
+): T[] {
+  let nonBlanksCount = 0;
+  for (let i = 0; i < originalItems.length; i++) {
+    if (!originalItems[i].isBlank) {
+      nonBlanksCount++;
+    }
+  }
+
+  const blanksWithMeta: { item: T; ratio: number }[] = [];
+  let nonBlanksSeen = 0;
+  for (let i = 0; i < originalItems.length; i++) {
+    if (originalItems[i].isBlank) {
+      blanksWithMeta.push({
+        item: originalItems[i],
+        ratio: nonBlanksCount > 0 ? nonBlanksSeen / nonBlanksCount : 0,
+      });
+    } else {
+      nonBlanksSeen++;
+    }
+  }
+
+  if (blanksWithMeta.length === 0) {
+    return reorderedNonBlanks;
+  }
+
+  const M = reorderedNonBlanks.length;
+  const blanksAtTarget = new Map<number, T[]>();
+  for (let i = 0; i <= M; i++) {
+    blanksAtTarget.set(i, []);
+  }
+
+  for (const meta of blanksWithMeta) {
+    const targetIdx = M > 0 ? Math.min(M, Math.max(0, Math.round(meta.ratio * M))) : 0;
+    const targetList = blanksAtTarget.get(targetIdx);
+    if (targetList) {
+      targetList.push(meta.item);
+    }
+  }
+
+  const result: T[] = [];
+  for (let i = 0; i <= M; i++) {
+    const blanks = blanksAtTarget.get(i);
+    if (blanks && blanks.length > 0) {
+      result.push(...blanks);
+    }
+    if (i < M) {
+      result.push(reorderedNonBlanks[i]);
+    }
+  }
+
+  return result;
 }
 
 export interface OrganizeOpts {
@@ -91,7 +199,11 @@ async function buildOrganizedPdf(
     const item = items[i];
 
     if (item.isBlank) {
-      outDoc.addPage([595.28, 841.89]);
+      const [width, height] = getInheritedPageDimensions(items, i, srcDocs);
+      const blankPage = outDoc.addPage([width, height]);
+      if (item.rotation) {
+        blankPage.setRotation(degrees(((Number(item.rotation) % 360) + 360) % 360));
+      }
     } else {
       const fileIdx = Number(item.fileIndex) || 0;
       const copied = copiedPagesPerDoc[fileIdx][pageCursors[fileIdx]++];
