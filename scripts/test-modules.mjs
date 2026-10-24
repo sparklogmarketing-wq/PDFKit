@@ -512,6 +512,20 @@ test("mod-organize", async (t) => {
     }, /No pages remaining/);
   });
 
+  await t.test("throws error when payload contains only blank pages", async () => {
+    await assert.rejects(async () => {
+      await organizeMod.run([
+        { name: "docA.pdf", data: pdfA },
+      ], { pages: [{ isBlank: true }] }, ctx);
+    }, /At least one real page is required/);
+
+    await assert.rejects(async () => {
+      await organizeMod.run([
+        { name: "docA.pdf", data: pdfA },
+      ], { pages: [{ isBlank: true }, { isBlank: true }] }, ctx);
+    }, /At least one real page is required/);
+  });
+
   await t.test("reorder paths: preserves blanks at start, middle, and end during file reorder", () => {
     const original = [
       { id: "b-start", isBlank: true },
@@ -746,6 +760,128 @@ test("mod-extract", async (t) => {
         ctx
       );
     }, /No pages selected/);
+  });
+});
+
+test("UI regression: OrganizeTool blank page validation and deletion down to zero real pages", async (t) => {
+  let files = [{ id: "f1", name: "docA.pdf" }];
+  let pages = [
+    { id: "p1", fileId: "f1", fileIndex: 0, pageIndex: 0, rotation: 0, isBlank: false },
+    { id: "b1", fileId: "blank", fileIndex: -1, pageIndex: -1, rotation: 0, isBlank: true },
+  ];
+  let error = "";
+  let runStarted = false;
+
+  const hasRealPages = () => pages.some((p) => !p.isBlank);
+  const isRunDisabled = () => files.length === 0 || pages.length === 0 || !hasRealPages();
+
+  function handleDeletePage(pageIdx) {
+    if (pages.length <= 1) {
+      error = "A PDF document must have at least one page.";
+      return;
+    }
+    const remaining = pages.filter((_, idx) => idx !== pageIdx);
+    if (!remaining.some((p) => !p.isBlank)) {
+      error = "At least one real page is required.";
+    } else {
+      error = "";
+    }
+    pages = remaining;
+  }
+
+  function handleRemoveFile(fileIdxToRemove) {
+    const fileToRemove = files[fileIdxToRemove];
+    if (!fileToRemove) return;
+
+    if (files.length <= 1) {
+      files = [];
+      pages = [];
+      error = "";
+      return;
+    }
+
+    const updatedFiles = files.filter((_, idx) => idx !== fileIdxToRemove);
+    const remainingPages = pages.filter((p) => p.fileId !== fileToRemove.id);
+
+    if (!remainingPages.some((p) => !p.isBlank)) {
+      error = "At least one real page is required.";
+    } else {
+      error = "";
+    }
+
+    files = updatedFiles;
+    pages = remainingPages;
+  }
+
+  function run() {
+    if (files.length === 0 || pages.length === 0 || !hasRealPages()) {
+      if (!hasRealPages() && pages.length > 0) {
+        error = "At least one real page is required.";
+      }
+      return;
+    }
+    error = "";
+    runStarted = true;
+  }
+
+  await t.test("deleting down to one blank and zero real pages disables Run and sets error", () => {
+    assert.equal(hasRealPages(), true);
+    assert.equal(isRunDisabled(), false);
+
+    // Delete the only real page (index 0)
+    handleDeletePage(0);
+
+    assert.equal(pages.length, 1);
+    assert.equal(pages[0].isBlank, true);
+    assert.equal(hasRealPages(), false);
+    assert.equal(isRunDisabled(), true);
+    assert.equal(error, "At least one real page is required.");
+
+    // Attempting to run should be a no-op and preserve error
+    run();
+    assert.equal(runStarted, false);
+    assert.equal(error, "At least one real page is required.");
+
+    // Attempting to delete the last remaining blank page should trigger the 1-page guard
+    handleDeletePage(0);
+    assert.equal(error, "A PDF document must have at least one page.");
+    assert.equal(pages.length, 1);
+  });
+
+  await t.test("adding a real page re-enables Run and clears error", () => {
+    pages.push({ id: "p2", fileId: "f1", fileIndex: 0, pageIndex: 1, rotation: 0, isBlank: false });
+    error = "";
+
+    assert.equal(hasRealPages(), true);
+    assert.equal(isRunDisabled(), false);
+    assert.equal(error, "");
+
+    run();
+    assert.equal(runStarted, true);
+  });
+
+  await t.test("removing a file that leaves only blank pages sets error and disables Run", () => {
+    // 2 files: f1 and f2
+    files = [{ id: "f1", name: "docA.pdf" }, { id: "f2", name: "docB.pdf" }];
+    pages = [
+      { id: "p2", fileId: "f2", fileIndex: 1, pageIndex: 0, rotation: 0, isBlank: false },
+      { id: "b1", fileId: "blank", fileIndex: -1, pageIndex: -1, rotation: 0, isBlank: true },
+    ];
+    error = "";
+    runStarted = false;
+
+    // Remove file f2 (index 1) which holds the only real page
+    handleRemoveFile(1);
+
+    assert.equal(files.length, 1);
+    assert.equal(pages.length, 1);
+    assert.equal(pages[0].isBlank, true);
+    assert.equal(hasRealPages(), false);
+    assert.equal(isRunDisabled(), true);
+    assert.equal(error, "At least one real page is required.");
+
+    run();
+    assert.equal(runStarted, false);
   });
 });
 

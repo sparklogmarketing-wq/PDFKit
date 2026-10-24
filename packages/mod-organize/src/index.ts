@@ -150,8 +150,9 @@ function validateOrganizeItems(
   srcDocs: PDFDocument[],
   fileNames: string[]
 ): void {
-  if (items.length === 0) {
-    throw new ToolError("No pages remaining to organize. At least one page must be kept.");
+  const nonBlankCount = items.filter((item) => !item.isBlank).length;
+  if (items.length === 0 || nonBlankCount === 0) {
+    throw new ToolError("No pages remaining to organize. At least one real page is required.");
   }
 
   for (const item of items) {
