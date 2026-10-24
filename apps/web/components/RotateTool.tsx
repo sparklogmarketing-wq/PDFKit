@@ -860,6 +860,8 @@ export default function RotateTool() {
 
   const cancelRef = useRef<(() => void) | null>(null);
   cancelRef.current = cancel;
+  const loadIdRef = useRef(0);
+  const runIdRef = useRef(0);
 
   /* Cleanup object URLs and cancel running worker on unmount */
   useEffect(() => {
@@ -921,6 +923,15 @@ export default function RotateTool() {
       return;
     }
 
+    if (!append) {
+      cancelRef.current?.();
+      setCancel(null);
+      setProgress(null);
+      setStatusMsg("");
+      runIdRef.current++;
+    }
+    const loadId = ++loadIdRef.current;
+
     setError("");
     setResults([]);
     setProgress(null);
@@ -932,6 +943,7 @@ export default function RotateTool() {
     setFiles(updatedFiles);
 
     const newPagesMap = await loadPdfPagesMap(arr, filePagesMap);
+    if (loadId !== loadIdRef.current) return;
     setFilePagesMap(newPagesMap);
 
     const highestPage = Object.values(newPagesMap).reduce((m, c) => Math.max(m, c), 1);
@@ -955,6 +967,12 @@ export default function RotateTool() {
   }
 
   function clearAllFiles() {
+    cancelRef.current?.();
+    loadIdRef.current++;
+    runIdRef.current++;
+    setProgress(null);
+    setStatusMsg("");
+    setCancel(null);
     setFiles([]);
     setFilePagesMap({});
     setPageAngles({});
@@ -998,6 +1016,7 @@ export default function RotateTool() {
   /* ── Process & Run Tool ──────────────────────────────────── */
   async function handleRotateSubmit() {
     if (files.length === 0 || isRunning) return;
+    const runId = ++runIdRef.current;
     setError("");
     setProgress(0);
     setStatusMsg("Preparing files for rotation...");
@@ -1009,6 +1028,7 @@ export default function RotateTool() {
           data: new Uint8Array(await f.arrayBuffer()),
         }))
       );
+      if (runId !== runIdRef.current) return;
 
       let currentGlobalPage = 1;
       const perFileRotations: Record<number, any> = {};
@@ -1037,12 +1057,15 @@ export default function RotateTool() {
       setStatusMsg(`Rotating ${files.length} PDF${files.length > 1 ? "s" : ""}...`);
 
       const job = runTool("rotate", inputs, toolOpts, (p) => {
-        setProgress(Math.round(p * 100));
-        setStatusMsg(`Processing pages... ${Math.round(p * 100)}%`);
+        if (runId === runIdRef.current) {
+          setProgress(Math.round(p * 100));
+          setStatusMsg(`Processing pages... ${Math.round(p * 100)}%`);
+        }
       });
 
       setCancel(() => job.cancel);
       const outputs: OutputFile[] = await job.promise;
+      if (runId !== runIdRef.current || files.length === 0) return;
 
       const res = outputs.map((out) => {
         const blob = new Blob([out.data as BlobPart], { type: out.mime || "application/pdf" });
@@ -1055,14 +1078,16 @@ export default function RotateTool() {
 
       setResults(res);
     } catch (err: any) {
-      if (!isCancelledError(err)) {
+      if (runId === runIdRef.current && !isCancelledError(err)) {
         console.error("Rotation error:", err);
         setError(err?.message || "An error occurred during rotation.");
       }
     } finally {
-      setProgress(null);
-      setStatusMsg("");
-      setCancel(null);
+      if (runId === runIdRef.current) {
+        setProgress(null);
+        setStatusMsg("");
+        setCancel(null);
+      }
     }
   }
 
@@ -1080,7 +1105,7 @@ export default function RotateTool() {
   }
 
   /* ── RENDER: Results View ────────────────────────────────── */
-  if (results.length > 0) {
+  if (results.length > 0 && files.length > 0) {
     return (
       <ToolResultsView
         title="PDFs Rotated Successfully!"

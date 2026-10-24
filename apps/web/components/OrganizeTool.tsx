@@ -348,13 +348,18 @@ export default function OrganizeTool() {
   const [error, setError] = useState("");
   const [results, setResults] = useState<{ name: string; url: string; size: number }[]>([]);
   const [cancel, setCancel] = useState<(() => void) | null>(null);
+  const cancelRef = useRef<(() => void) | null>(null);
+  cancelRef.current = cancel;
+  const loadIdRef = useRef(0);
+  const runIdRef = useRef(0);
 
   const isRunning = progress !== null;
   const hasRealPages = pages.some((p) => !p.isBlank);
 
-  /* Cleanup URLs on unmount */
+  /* Cleanup URLs and cancel active job on unmount */
   useEffect(() => {
     return () => {
+      cancelRef.current?.();
       results.forEach((r) => URL.revokeObjectURL(r.url));
     };
   }, [results]);
@@ -371,9 +376,11 @@ export default function OrganizeTool() {
       }
       setError("");
 
+      const loadId = ++loadIdRef.current;
       const newEntries: FileEntry[] = [];
       const newPagesList: PageItem[] = [];
       const fileInfos = await Promise.all(arr.map((file) => getPdfInfo(file)));
+      if (loadId !== loadIdRef.current) return;
 
       for (let i = 0; i < arr.length; i++) {
         const file = arr[i];
@@ -651,11 +658,15 @@ export default function OrganizeTool() {
   }
 
   function reset() {
+    cancelRef.current?.();
+    loadIdRef.current++;
+    runIdRef.current++;
     setFiles([]);
     setPages([]);
     setResults([]);
     setError("");
     setProgress(null);
+    setStatusMsg("");
     setCancel(null);
     setSortAlphaDir("A-Z");
     setSortNumDir("1-9");
@@ -671,6 +682,7 @@ export default function OrganizeTool() {
       }
       return;
     }
+    const runId = ++runIdRef.current;
     setError("");
     setResults([]);
     setProgress(0.05);
@@ -684,6 +696,7 @@ export default function OrganizeTool() {
           data: new Uint8Array(await f.file.arrayBuffer()),
         }))
       );
+      if (runId !== runIdRef.current) return;
 
       // 2. Prepare pages spec
       const pagesSpec = pages.map((p) => ({
@@ -703,13 +716,16 @@ export default function OrganizeTool() {
         inputFiles,
         { pages: pagesSpec, outputName },
         (p) => {
-          setProgress(Math.max(0.1, p));
-          setStatusMsg(`Organizing PDF (${Math.round(p * 100)}%)…`);
+          if (runId === runIdRef.current) {
+            setProgress(Math.max(0.1, p));
+            setStatusMsg(`Organizing PDF (${Math.round(p * 100)}%)…`);
+          }
         }
       );
 
-      setCancel(() => () => job.cancel());
+      setCancel(() => job.cancel);
       const outputs: OutputFile[] = await job.promise;
+      if (runId !== runIdRef.current || files.length === 0) return;
 
       const mapped = outputs.map((o) => ({
         name: o.name,
@@ -719,13 +735,15 @@ export default function OrganizeTool() {
 
       setResults(mapped);
     } catch (err: any) {
-      if (!isCancelledError(err)) {
+      if (runId === runIdRef.current && !isCancelledError(err)) {
         setError(err?.message ?? "An error occurred while organizing the PDF.");
       }
     } finally {
-      setProgress(null);
-      setStatusMsg("");
-      setCancel(null);
+      if (runId === runIdRef.current) {
+        setProgress(null);
+        setStatusMsg("");
+        setCancel(null);
+      }
     }
   }
 
@@ -822,7 +840,7 @@ export default function OrganizeTool() {
   }
 
   /* ── 2. Render Results Screen ────────────────────────────── */
-  if (results.length > 0) {
+  if (results.length > 0 && files.length > 0) {
     return (
       <div className="split-tool-wrap">
         <div

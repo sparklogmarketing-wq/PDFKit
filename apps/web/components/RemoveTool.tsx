@@ -541,6 +541,8 @@ export default function RemoveTool() {
 
   const cancelRef = useRef<(() => void) | null>(null);
   cancelRef.current = cancel;
+  const loadIdRef = useRef(0);
+  const runIdRef = useRef(0);
 
   /* Cleanup object URLs and cancel running worker on unmount */
   useEffect(() => {
@@ -562,6 +564,13 @@ export default function RemoveTool() {
       return;
     }
 
+    cancelRef.current?.();
+    setCancel(null);
+    setProgress(null);
+    setStatusMessage("");
+    runIdRef.current++;
+    const loadId = ++loadIdRef.current;
+
     const selectedFile = pdfs[0];
     setError("");
     setResults([]);
@@ -574,11 +583,18 @@ export default function RemoveTool() {
     setFile(selectedFile);
 
     const info = await getPdfInfo(selectedFile);
+    if (loadId !== loadIdRef.current) return;
     const pagesCount = info?.numPages || 1;
     setNumPages(pagesCount);
   }, []);
 
   function clearAllFiles() {
+    cancelRef.current?.();
+    loadIdRef.current++;
+    runIdRef.current++;
+    setProgress(null);
+    setStatusMessage("");
+    setCancel(null);
     setFile(null);
     setNumPages(0);
     setDeletedPages(new Set());
@@ -640,6 +656,7 @@ export default function RemoveTool() {
   /* ── Run Tool Execution ──────────────────────────────────── */
   async function handleRemoveSubmit() {
     if (!file || deletedPages.size === 0) return;
+    const runId = ++runIdRef.current;
     setConfirmModalOpen(false);
 
     if (deletedPages.size >= numPages) {
@@ -653,6 +670,7 @@ export default function RemoveTool() {
 
     try {
       const data = new Uint8Array(await file.arrayBuffer());
+      if (runId !== runIdRef.current) return;
       const inputs = [{ name: file.name, data }];
 
       const job = runTool(
@@ -663,13 +681,16 @@ export default function RemoveTool() {
           outputFileName,
         },
         (p: number) => {
-          setProgress(p);
-          setStatusMessage(`Removing pages... ${Math.round(p * 100)}%`);
+          if (runId === runIdRef.current) {
+            setProgress(p);
+            setStatusMessage(`Removing pages... ${Math.round(p * 100)}%`);
+          }
         }
       );
 
       setCancel(() => job.cancel);
       const outputs = await job.promise;
+      if (runId !== runIdRef.current || !file) return;
 
       const items = outputs.map((item) => {
         const blob = new Blob([item.data as BlobPart], { type: item.mime || "application/pdf" });
@@ -682,20 +703,22 @@ export default function RemoveTool() {
 
       setResults(items);
     } catch (err: unknown) {
-      if (!isCancelledError(err)) {
+      if (runId === runIdRef.current && !isCancelledError(err)) {
         const msg = err instanceof Error ? err.message : "An error occurred while removing pages.";
         console.error("Remove pages error:", err);
         setError(msg);
       }
     } finally {
-      setProgress(null);
-      setStatusMessage("");
-      setCancel(null);
+      if (runId === runIdRef.current) {
+        setProgress(null);
+        setStatusMessage("");
+        setCancel(null);
+      }
     }
   }
 
   /* ── RENDER: Results View ────────────────────────────────── */
-  if (results.length > 0) {
+  if (results.length > 0 && file) {
     return (
       <ToolResultsView
         title="Pages Removed Successfully!"

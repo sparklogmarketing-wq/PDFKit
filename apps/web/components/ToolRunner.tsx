@@ -34,10 +34,14 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
   const [rotatingIdx, setRotatingIdx] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cancelRef = useRef<(() => void) | null>(null);
+  cancelRef.current = cancel;
+  const runIdRef = useRef(0);
 
-  // Revoke object URLs on unmount or before new runs
+  // Revoke object URLs on unmount or before new runs, and cancel active jobs
   useEffect(() => {
     return () => {
+      cancelRef.current?.();
       results.forEach((r) => URL.revokeObjectURL(r.url));
     };
   }, [results]);
@@ -75,7 +79,13 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
         return [...prev, ...newOnes];
       });
     } else {
+      runIdRef.current++;
+      cancelRef.current?.();
+      setCancel(null);
+      setProgress(null);
+      setStatusMessage("");
       setFiles([arr[0]]);
+      setResults([]);
     }
   }
 
@@ -94,6 +104,11 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
   }
 
   function clearAllFiles() {
+    runIdRef.current++;
+    cancelRef.current?.();
+    setCancel(null);
+    setProgress(null);
+    setStatusMessage("");
     setFiles([]);
     setResults([]);
     setError("");
@@ -197,6 +212,7 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
       return;
     }
 
+    const runId = ++runIdRef.current;
     setError("");
     setResults([]);
     setProgress(0.05);
@@ -209,15 +225,19 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
           data: new Uint8Array(await f.arrayBuffer()),
         }))
       );
+      if (runId !== runIdRef.current) return;
 
       setStatusMessage("Processing...");
       const job = runTool(manifest.id, inputs, opts, (p) => {
-        setProgress(Math.max(0.1, p));
-        setStatusMessage(`Processing (${Math.round(p * 100)}%)...`);
+        if (runId === runIdRef.current) {
+          setProgress(Math.max(0.1, p));
+          setStatusMessage(`Processing (${Math.round(p * 100)}%)...`);
+        }
       });
 
       setCancel(() => job.cancel);
       const outs: OutputFile[] = await job.promise;
+      if (runId !== runIdRef.current || files.length === 0) return;
 
       setStatusMessage("Complete");
       setProgress(1);
@@ -230,13 +250,15 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
         }))
       );
     } catch (e: any) {
-      if (!isCancelledError(e)) {
+      if (runId === runIdRef.current && !isCancelledError(e)) {
         setError(e?.message || "An unexpected error occurred during processing.");
       }
     } finally {
-      setProgress(null);
-      setCancel(null);
-      setStatusMessage("");
+      if (runId === runIdRef.current) {
+        setProgress(null);
+        setCancel(null);
+        setStatusMessage("");
+      }
     }
   }
 
@@ -554,7 +576,7 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
       </div>
 
       {/* Results / Download Section */}
-      {results.length > 0 && (
+      {results.length > 0 && files.length > 0 && (
         <div className="results-card">
           <div className="results-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
