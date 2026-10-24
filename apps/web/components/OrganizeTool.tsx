@@ -7,6 +7,7 @@ import { runTool, isCancelledError } from "../lib/runTool";
 import { formatBytes } from "../lib/formatBytes";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
+import { reinsertBlanksAtRelativePositions } from "@pdfkit/mod-organize";
 
 /* ── Color Themes for files matching iLovePDF ─────────────── */
 export interface ColorTheme {
@@ -43,6 +44,8 @@ export interface PageItem {
   pageIndex: number; // 0-indexed original page
   rotation: number; // 0, 90, 180, 270
   isBlank?: boolean;
+  width?: number;
+  height?: number;
 }
 
 interface OrganizePageCardProps {
@@ -233,7 +236,13 @@ function OrganizePageCard({
           aria-label={item.isBlank ? undefined : `Preview page ${seqNumber}`}
         >
           {item.isBlank ? (
-            <div className="organize-blank-sheet">
+            <div
+              className="organize-blank-sheet"
+              style={{
+                transform: `rotate(${item.rotation}deg)`,
+                transition: "transform 0.2s ease",
+              }}
+            >
               <span>Blank page</span>
             </div>
           ) : (
@@ -269,7 +278,7 @@ function handleCardDragLeave(e: React.DragEvent) {
   e.stopPropagation();
 }
 
-function resequencePagesForFiles(
+export function resequencePagesForFiles(
   orderedFiles: FileEntry[],
   currentPages: PageItem[]
 ): { reLetteredFiles: FileEntry[]; updatedPages: PageItem[] } {
@@ -283,28 +292,28 @@ function resequencePagesForFiles(
   for (const f of reLetteredFiles) {
     pagesByFile.set(f.id, []);
   }
-  const blankPages: PageItem[] = [];
 
   for (const p of currentPages) {
-    if (p.isBlank || !pagesByFile.has(p.fileId)) {
-      blankPages.push(p);
-    } else {
-      pagesByFile.get(p.fileId)!.push(p);
+    if (!p.isBlank && pagesByFile.has(p.fileId)) {
+      const fileList = pagesByFile.get(p.fileId);
+      if (fileList) {
+        fileList.push(p);
+      }
     }
   }
 
-  const updatedPages: PageItem[] = [];
+  const reorderedNonBlanks: PageItem[] = [];
   reLetteredFiles.forEach((fileEntry, newFileIdx) => {
     const filePages = pagesByFile.get(fileEntry.id) || [];
     filePages.forEach((p) => {
-      updatedPages.push({
+      reorderedNonBlanks.push({
         ...p,
         fileIndex: newFileIdx,
       });
     });
   });
 
-  updatedPages.push(...blankPages);
+  const updatedPages = reinsertBlanksAtRelativePositions(currentPages, reorderedNonBlanks);
   return { reLetteredFiles, updatedPages };
 }
 
@@ -524,19 +533,21 @@ export default function OrganizeTool() {
   // 2. Sort 1-9 / 9-1: Natural vs Reverse page order
   function handleNumericSort() {
     setPages((prev) => {
+      const nonBlank = prev.filter((p) => !p.isBlank);
       if (sortNumDir === "1-9") {
         setSortNumDir("9-1");
-        return [...prev].reverse();
+        const sortedDesc = [...nonBlank].sort((a, b) => {
+          if (a.fileIndex !== b.fileIndex) return b.fileIndex - a.fileIndex;
+          return b.pageIndex - a.pageIndex;
+        });
+        return reinsertBlanksAtRelativePositions(prev, sortedDesc);
       } else {
         setSortNumDir("1-9");
-        // Sort non-blank pages ascending by fileIndex then pageIndex
-        const nonBlank = prev.filter((p) => !p.isBlank);
-        const blanks = prev.filter((p) => p.isBlank);
-        const sorted = [...nonBlank].sort((a, b) => {
+        const sortedAsc = [...nonBlank].sort((a, b) => {
           if (a.fileIndex !== b.fileIndex) return a.fileIndex - b.fileIndex;
           return a.pageIndex - b.pageIndex;
         });
-        return [...sorted, ...blanks];
+        return reinsertBlanksAtRelativePositions(prev, sortedAsc);
       }
     });
   }
@@ -546,7 +557,7 @@ export default function OrganizeTool() {
     if (files.length <= 1) return;
     setPages((prev) => {
       const byFile: PageItem[][] = files.map((_, fi) =>
-        prev.filter((p) => p.fileIndex === fi)
+        prev.filter((p) => p.fileIndex === fi && !p.isBlank)
       );
       const maxPages = Math.max(...byFile.map((arr) => arr.length));
       const interleaved: PageItem[] = [];
@@ -558,9 +569,7 @@ export default function OrganizeTool() {
           }
         }
       }
-      // Add any remaining blanks
-      const blanks = prev.filter((p) => p.isBlank);
-      return [...interleaved, ...blanks];
+      return reinsertBlanksAtRelativePositions(prev, interleaved);
     });
   }
 
@@ -665,6 +674,8 @@ export default function OrganizeTool() {
         pageIndex: p.pageIndex,
         rotation: p.rotation,
         isBlank: p.isBlank,
+        width: p.width,
+        height: p.height,
       }));
 
       const firstBase = files[0].file.name.replace(/\.pdf$/i, "");

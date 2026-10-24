@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import { PDFDocument } from "@cantoo/pdf-lib";
 import { parsePageSpec, ToolError } from "../packages/core/src/index.ts";
 import mergeMod from "../packages/mod-merge/src/index.ts";
-import splitMod from "../packages/mod-split/src/index.ts";
+import splitMod, { DEFAULT_MAX_SIZE_BYTES } from "../packages/mod-split/src/index.ts";
 import rotateMod from "../packages/mod-rotate/src/index.ts";
 import removeMod from "../packages/mod-remove/src/index.ts";
-import organizeMod from "../packages/mod-organize/src/index.ts";
+import organizeMod, { reinsertBlanksAtRelativePositions, getInheritedPageDimensions } from "../packages/mod-organize/src/index.ts";
 import extractMod from "../packages/mod-extract/src/index.ts";
 import "./test-cancellation.mjs";
 import "./test-pdf-cache-perf.mjs";
@@ -204,6 +204,45 @@ test("mod-split", async (t) => {
       ], { mode: "size", maxSizeBytes: exactBytes - 1, allowCompression: true }, ctx),
       /Page 1 size.*exceeds the maximum allowed size/i
     );
+  });
+
+  await t.test("defaults: manifest and module expose the same default 500,000 bytes", async () => {
+    assert.equal(DEFAULT_MAX_SIZE_BYTES, 500000);
+    const sizeField = splitMod.manifest.fields.find((f) => f.key === "maxSizeBytes");
+    assert.ok(sizeField, "maxSizeBytes field exists in manifest");
+    assert.equal(sizeField.default, DEFAULT_MAX_SIZE_BYTES);
+
+    // Running with mode: "size" and no maxSizeBytes uses DEFAULT_MAX_SIZE_BYTES
+    const results = await splitMod.run([
+      { name: "sample.pdf", data: pdf },
+    ], { mode: "size" }, ctx);
+    assert.ok(results.length >= 1);
+    for (const res of results) {
+      assert.ok(res.data.byteLength <= DEFAULT_MAX_SIZE_BYTES);
+    }
+  });
+
+  await t.test("mergeAll with size mode: rejects when total size exceeds limit", async () => {
+    // 5-page PDF with small budget forces multiple parts, so mergeAll cannot fit within limit
+    await assert.rejects(
+      async () => await splitMod.run([
+        { name: "sample.pdf", data: pdf },
+      ], { mode: "size", maxSizeBytes: 1500, mergeAll: true }, ctx),
+      /Cannot merge all parts into a single PDF: total size exceeds the maximum size limit/i
+    );
+  });
+
+  await t.test("mergeAll with size mode: succeeds when total size fits within limit", async () => {
+    // 5-page PDF fits within 500,000 bytes
+    const results = await splitMod.run([
+      { name: "sample.pdf", data: pdf },
+    ], { mode: "size", maxSizeBytes: 500000, mergeAll: true }, ctx);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "sample-merged.pdf");
+    assert.ok(results[0].data.byteLength <= 500000);
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 5);
   });
 });
 
@@ -471,6 +510,163 @@ test("mod-organize", async (t) => {
         { name: "docA.pdf", data: pdfA },
       ], { pages: [] }, ctx);
     }, /No pages remaining/);
+  });
+
+  await t.test("reorder paths: preserves blanks at start, middle, and end during file reorder", () => {
+    const original = [
+      { id: "b-start", isBlank: true },
+      { id: "a1", fileIndex: 0 },
+      { id: "b-mid", isBlank: true },
+      { id: "b1", fileIndex: 1 },
+      { id: "b-end", isBlank: true },
+    ];
+    // Reorder: file 1 then file 0
+    const reordered = [
+      { id: "b1", fileIndex: 0 },
+      { id: "a1", fileIndex: 1 },
+    ];
+    const result = reinsertBlanksAtRelativePositions(original, reordered);
+    assert.equal(result.length, 5);
+    assert.equal(result[0].id, "b-start");
+    assert.equal(result[1].id, "b1");
+    assert.equal(result[2].id, "b-mid");
+    assert.equal(result[3].id, "a1");
+    assert.equal(result[4].id, "b-end");
+  });
+
+  await t.test("numeric sort: preserves blanks at start, middle, and end", () => {
+    const original = [
+      { id: "b-start", isBlank: true },
+      { id: "p1", fileIndex: 0, pageIndex: 0 },
+      { id: "b-mid", isBlank: true },
+      { id: "p2", fileIndex: 0, pageIndex: 1 },
+      { id: "b-end", isBlank: true },
+    ];
+    // Sort descending 9-1
+    const sortedDesc = [
+      { id: "p2", fileIndex: 0, pageIndex: 1 },
+      { id: "p1", fileIndex: 0, pageIndex: 0 },
+    ];
+    const resultDesc = reinsertBlanksAtRelativePositions(original, sortedDesc);
+    assert.equal(resultDesc.length, 5);
+    assert.equal(resultDesc[0].id, "b-start");
+    assert.equal(resultDesc[1].id, "p2");
+    assert.equal(resultDesc[2].id, "b-mid");
+    assert.equal(resultDesc[3].id, "p1");
+    assert.equal(resultDesc[4].id, "b-end");
+  });
+
+  await t.test("interleave: preserves blanks at start, middle, and end", () => {
+    const original = [
+      { id: "b-start", isBlank: true },
+      { id: "a1", fileIndex: 0, pageIndex: 0 },
+      { id: "a2", fileIndex: 0, pageIndex: 1 },
+      { id: "b-mid", isBlank: true },
+      { id: "b1", fileIndex: 1, pageIndex: 0 },
+      { id: "b2", fileIndex: 1, pageIndex: 1 },
+      { id: "b-end", isBlank: true },
+    ];
+    // Round-robin interleaved non-blanks: a1, b1, a2, b2
+    const interleaved = [
+      { id: "a1", fileIndex: 0, pageIndex: 0 },
+      { id: "b1", fileIndex: 1, pageIndex: 0 },
+      { id: "a2", fileIndex: 0, pageIndex: 1 },
+      { id: "b2", fileIndex: 1, pageIndex: 1 },
+    ];
+    const result = reinsertBlanksAtRelativePositions(original, interleaved);
+    assert.equal(result.length, 7);
+    assert.equal(result[0].id, "b-start");
+    assert.equal(result[6].id, "b-end");
+    // b-mid should be placed after 2 non-blanks (a1, b1)
+    assert.equal(result[3].id, "b-mid");
+  });
+
+  await t.test("remove file/page: preserves blanks at relative positions", () => {
+    const original = [
+      { id: "b-start", isBlank: true },
+      { id: "p1" },
+      { id: "p2" },
+      { id: "b-mid", isBlank: true },
+      { id: "p3" },
+      { id: "p4" },
+      { id: "b-end", isBlank: true },
+    ];
+    // Remove p2, p3, p4 -> leaves p1
+    const remaining = [{ id: "p1" }];
+    const result = reinsertBlanksAtRelativePositions(original, remaining);
+    assert.equal(result.length, 4);
+    assert.equal(result[0].id, "b-start");
+    assert.equal(result[1].id, "p1");
+    assert.equal(result[2].id, "b-mid");
+    assert.equal(result[3].id, "b-end");
+  });
+
+  await t.test("inherits page size/orientation from neighboring pages (portrait and landscape)", async () => {
+    // Create doc with page 1: Letter Portrait [612, 792], page 2: Landscape [800, 500]
+    const docMixed = await PDFDocument.create();
+    const p1 = docMixed.addPage([612, 792]);
+    p1.drawText("Letter Portrait");
+    const p2 = docMixed.addPage([800, 500]);
+    p2.drawText("Landscape");
+    const mixedBytes = await docMixed.save();
+
+    const pages = [
+      { isBlank: true }, // at start: should inherit from page 0 (Letter [612, 792])
+      { fileIndex: 0, pageIndex: 0 },
+      { isBlank: true }, // in middle: should inherit from preceding page 0 (Letter [612, 792])
+      { fileIndex: 0, pageIndex: 1 },
+      { isBlank: true }, // at end: should inherit from preceding page 1 (Landscape [800, 500])
+    ];
+
+    const results = await organizeMod.run([
+      { name: "mixed.pdf", data: mixedBytes },
+    ], { pages }, ctx);
+
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 5);
+
+    const size0 = doc.getPage(0).getSize();
+    assert.equal(size0.width, 612);
+    assert.equal(size0.height, 792);
+
+    const size1 = doc.getPage(1).getSize();
+    assert.equal(size1.width, 612);
+    assert.equal(size1.height, 792);
+
+    const size2 = doc.getPage(2).getSize();
+    assert.equal(size2.width, 612);
+    assert.equal(size2.height, 792);
+
+    const size3 = doc.getPage(3).getSize();
+    assert.equal(size3.width, 800);
+    assert.equal(size3.height, 500);
+
+    const size4 = doc.getPage(4).getSize();
+    assert.equal(size4.width, 800);
+    assert.equal(size4.height, 500);
+  });
+
+  await t.test("honors explicit width, height, and rotation on blank pages", async () => {
+    const pages = [
+      { isBlank: true, width: 400, height: 600, rotation: 90 },
+      { fileIndex: 0, pageIndex: 0 },
+      { isBlank: true, rotation: 180 },
+    ];
+
+    const results = await organizeMod.run([
+      { name: "docA.pdf", data: pdfA },
+    ], { pages }, ctx);
+
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 3);
+
+    const page0 = doc.getPage(0);
+    assert.equal(page0.getSize().width, 400);
+    assert.equal(page0.getSize().height, 600);
+    assert.equal(page0.getRotation().angle, 90);
+
+    const page2 = doc.getPage(2);
+    assert.equal(page2.getRotation().angle, 180);
   });
 });
 
