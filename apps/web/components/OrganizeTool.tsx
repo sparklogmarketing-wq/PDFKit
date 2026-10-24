@@ -354,6 +354,7 @@ export default function OrganizeTool() {
   const runIdRef = useRef(0);
 
   const isRunning = progress !== null;
+  const hasRealPages = pages.some((p) => !p.isBlank);
 
   /* Cleanup URLs and cancel active job on unmount */
   useEffect(() => {
@@ -450,8 +451,13 @@ export default function OrganizeTool() {
       setError("A PDF document must have at least one page.");
       return;
     }
-    setError("");
-    setPages((prev) => prev.filter((_, idx) => idx !== pageIdx));
+    const remaining = pages.filter((_, idx) => idx !== pageIdx);
+    if (!remaining.some((p) => !p.isBlank)) {
+      setError("At least one real page is required.");
+    } else {
+      setError("");
+    }
+    setPages(remaining);
   }
 
   function handleInsertBlank(insertAt: number) {
@@ -597,6 +603,12 @@ export default function OrganizeTool() {
 
     const { reLetteredFiles, updatedPages } = resequencePagesForFiles(updatedFiles, remainingPages);
 
+    if (!updatedPages.some((p) => !p.isBlank)) {
+      setError("At least one real page is required.");
+    } else {
+      setError("");
+    }
+
     setFiles(reLetteredFiles);
     setPages(updatedPages);
   }
@@ -664,7 +676,12 @@ export default function OrganizeTool() {
 
   /* ── Run Organize ───────────────────────────────────────── */
   async function run() {
-    if (files.length === 0 || pages.length === 0) return;
+    if (files.length === 0 || pages.length === 0 || !hasRealPages) {
+      if (!hasRealPages && pages.length > 0) {
+        setError("At least one real page is required.");
+      }
+      return;
+    }
     const runId = ++runIdRef.current;
     setError("");
     setResults([]);
@@ -1199,7 +1216,8 @@ export default function OrganizeTool() {
                 type="button"
                 className="split-run-btn"
                 onClick={run}
-                disabled={files.length === 0 || pages.length === 0}
+                disabled={files.length === 0 || pages.length === 0 || !hasRealPages}
+                title={!hasRealPages && pages.length > 0 ? "At least one real page is required." : undefined}
               >
                 Organize
                 <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
