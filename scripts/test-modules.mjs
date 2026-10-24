@@ -527,6 +527,75 @@ test("mod-organize", async (t) => {
     }, /At least one real page is required/);
   });
 
+  await t.test("table-driven invalid payload validation", async () => {
+    const invalidCases = [
+      { name: "object payload instead of array", pages: { a: 1 }, errorRegex: /must be an array/ },
+      { name: "JSON object string instead of array", pages: '{"a": 1}', errorRegex: /must be an array/ },
+      { name: "number payload", pages: 42, errorRegex: /must be an array/ },
+      { name: "array of primitive numbers", pages: [0, 1], errorRegex: /item must be an object/ },
+      { name: "missing fileIndex", pages: [{ pageIndex: 0 }], errorRegex: /Invalid or missing fileIndex/ },
+      { name: "string fileIndex", pages: [{ fileIndex: "abc", pageIndex: 0 }], errorRegex: /Invalid or missing fileIndex/ },
+      { name: "string numeric fileIndex", pages: [{ fileIndex: "0", pageIndex: 0 }], errorRegex: /Invalid or missing fileIndex/ },
+      { name: "fractional fileIndex", pages: [{ fileIndex: 0.5, pageIndex: 0 }], errorRegex: /Invalid or missing fileIndex/ },
+      { name: "negative fileIndex", pages: [{ fileIndex: -1, pageIndex: 0 }], errorRegex: /Invalid file index -1/ },
+      { name: "out-of-range fileIndex", pages: [{ fileIndex: 5, pageIndex: 0 }], errorRegex: /Invalid file index 5/ },
+      { name: "missing pageIndex", pages: [{ fileIndex: 0 }], errorRegex: /Invalid or missing pageIndex/ },
+      { name: "string pageIndex", pages: [{ fileIndex: 0, pageIndex: "abc" }], errorRegex: /Invalid or missing pageIndex/ },
+      { name: "string numeric pageIndex", pages: [{ fileIndex: 0, pageIndex: "0" }], errorRegex: /Invalid or missing pageIndex/ },
+      { name: "fractional pageIndex", pages: [{ fileIndex: 0, pageIndex: 0.5 }], errorRegex: /Invalid or missing pageIndex/ },
+      { name: "negative pageIndex", pages: [{ fileIndex: 0, pageIndex: -1 }], errorRegex: /Invalid page index -1/ },
+      { name: "out-of-range pageIndex", pages: [{ fileIndex: 0, pageIndex: 99 }], errorRegex: /Invalid page index 99/ },
+      { name: "negative rotation", pages: [{ fileIndex: 0, pageIndex: 0, rotation: -90 }], errorRegex: /Invalid rotation value -90/ },
+      { name: "non-orthogonal rotation", pages: [{ fileIndex: 0, pageIndex: 0, rotation: 45 }], errorRegex: /Invalid rotation value 45/ },
+      { name: "fractional rotation", pages: [{ fileIndex: 0, pageIndex: 0, rotation: 90.5 }], errorRegex: /Invalid rotation value 90.5/ },
+      { name: "NaN rotation", pages: [{ fileIndex: 0, pageIndex: 0, rotation: NaN }], errorRegex: /Invalid rotation value NaN/ },
+      { name: "invalid rotation on blank item", pages: [{ fileIndex: 0, pageIndex: 0 }, { isBlank: true, rotation: -90 }], errorRegex: /Invalid rotation value -90/ },
+    ];
+
+    for (const c of invalidCases) {
+      await assert.rejects(async () => {
+        await organizeMod.run([{ name: "docA.pdf", data: pdfA }], { pages: c.pages }, ctx);
+      }, c.errorRegex, `Failed for case: ${c.name}`);
+    }
+  });
+
+  await t.test("valid round-trip test with spec array and JSON string", async () => {
+    const validSpec = [
+      { fileIndex: 0, pageIndex: 2, rotation: 90 },
+      { isBlank: true, rotation: 180 },
+      { fileIndex: 0, pageIndex: 0, rotation: 270 },
+      { fileIndex: 0, pageIndex: 1, rotation: 0 },
+    ];
+
+    // 1. Run with array
+    const arrayResult = await organizeMod.run(
+      [{ name: "docA.pdf", data: pdfA }],
+      { pages: validSpec },
+      ctx
+    );
+    assert.equal(arrayResult.length, 1);
+    const docFromArray = await PDFDocument.load(arrayResult[0].data);
+    assert.equal(docFromArray.getPageCount(), 4);
+    assert.equal(docFromArray.getPage(0).getRotation().angle, 90);
+    assert.equal(docFromArray.getPage(1).getRotation().angle, 180);
+    assert.equal(docFromArray.getPage(2).getRotation().angle, 270);
+    assert.equal(docFromArray.getPage(3).getRotation().angle, 0);
+
+    // 2. Run with JSON string
+    const jsonResult = await organizeMod.run(
+      [{ name: "docA.pdf", data: pdfA }],
+      { pages: JSON.stringify(validSpec) },
+      ctx
+    );
+    assert.equal(jsonResult.length, 1);
+    const docFromJson = await PDFDocument.load(jsonResult[0].data);
+    assert.equal(docFromJson.getPageCount(), 4);
+    assert.equal(docFromJson.getPage(0).getRotation().angle, 90);
+    assert.equal(docFromJson.getPage(1).getRotation().angle, 180);
+    assert.equal(docFromJson.getPage(2).getRotation().angle, 270);
+    assert.equal(docFromJson.getPage(3).getRotation().angle, 0);
+  });
+
   await t.test("reorder paths: preserves blanks at start, middle, and end during file reorder", () => {
     const original = [
       { id: "b-start", isBlank: true },

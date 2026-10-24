@@ -122,27 +122,89 @@ export interface OrganizeOpts {
   outputName?: string;
 }
 
-function parseOrganizeItems(opts: OrganizeOpts, srcDocs: PDFDocument[]): OrganizePageItem[] {
-  if (Array.isArray(opts.pages)) {
-    return opts.pages;
+const VALID_ROTATIONS = new Set([0, 90, 180, 270]);
+
+function validateRotation(rotation: unknown, index: number): void {
+  if (rotation === undefined || rotation === null) return;
+  if (typeof rotation !== "number" || !VALID_ROTATIONS.has(rotation)) {
+    throw new ToolError(
+      `Invalid rotation value ${String(rotation)} at index ${index}. Rotation must be one of 0, 90, 180, or 270 degrees.`
+    );
   }
-  if (typeof opts.pages === "string" && opts.pages.trim()) {
+}
+
+function validateFileIndex(
+  fileIndex: unknown,
+  index: number,
+  srcDocsLength: number
+): number {
+  if (typeof fileIndex !== "number" || !Number.isInteger(fileIndex)) {
+    throw new ToolError(`Invalid or missing fileIndex at index ${index}. Must be an integer.`);
+  }
+  if (fileIndex < 0 || fileIndex >= srcDocsLength) {
+    throw new ToolError(`Invalid file index ${fileIndex}.`);
+  }
+  return fileIndex;
+}
+
+function validatePageIndex(
+  fileIndex: number,
+  pageIndex: unknown,
+  index: number,
+  srcDocs: PDFDocument[],
+  fileNames: string[]
+): void {
+  if (typeof pageIndex !== "number" || !Number.isInteger(pageIndex)) {
+    throw new ToolError(`Invalid or missing pageIndex at index ${index}. Must be an integer.`);
+  }
+  const src = srcDocs[fileIndex];
+  if (pageIndex < 0 || pageIndex >= src.getPageCount()) {
+    throw new ToolError(`Invalid page index ${pageIndex} for file ${fileNames[fileIndex]}.`);
+  }
+}
+
+function parseOrganizeItems(opts: OrganizeOpts, srcDocs: PDFDocument[]): OrganizePageItem[] {
+  if (opts.pages === undefined || opts.pages === null) {
+    // Default: copy all pages from all files in input order
+    const defaultItems: OrganizePageItem[] = [];
+    for (let f = 0; f < srcDocs.length; f++) {
+      const count = srcDocs[f].getPageCount();
+      for (let p = 0; p < count; p++) {
+        defaultItems.push({ fileIndex: f, pageIndex: p, rotation: 0 });
+      }
+    }
+    return defaultItems;
+  }
+
+  if (typeof opts.pages === "string") {
+    const trimmed = opts.pages.trim();
+    if (!trimmed) {
+      const defaultItems: OrganizePageItem[] = [];
+      for (let f = 0; f < srcDocs.length; f++) {
+        const count = srcDocs[f].getPageCount();
+        for (let p = 0; p < count; p++) {
+          defaultItems.push({ fileIndex: f, pageIndex: p, rotation: 0 });
+        }
+      }
+      return defaultItems;
+    }
+    let parsed: unknown;
     try {
-      return JSON.parse(opts.pages);
+      parsed = JSON.parse(trimmed);
     } catch {
       throw new ToolError("Invalid pages specification JSON.");
     }
+    if (!Array.isArray(parsed)) {
+      throw new ToolError("Pages specification must be an array of page items.");
+    }
+    return parsed as OrganizePageItem[];
   }
 
-  // Default: copy all pages from all files in input order
-  const defaultItems: OrganizePageItem[] = [];
-  for (let f = 0; f < srcDocs.length; f++) {
-    const count = srcDocs[f].getPageCount();
-    for (let p = 0; p < count; p++) {
-      defaultItems.push({ fileIndex: f, pageIndex: p, rotation: 0 });
-    }
+  if (Array.isArray(opts.pages)) {
+    return opts.pages;
   }
-  return defaultItems;
+
+  throw new ToolError("Pages specification must be an array of page items.");
 }
 
 function validateOrganizeItems(
@@ -150,22 +212,33 @@ function validateOrganizeItems(
   srcDocs: PDFDocument[],
   fileNames: string[]
 ): void {
-  const nonBlankCount = items.filter((item) => !item.isBlank).length;
-  if (items.length === 0 || nonBlankCount === 0) {
+  if (!Array.isArray(items)) {
+    throw new ToolError("Pages specification must be an array of page items.");
+  }
+  if (items.length === 0) {
     throw new ToolError("No pages remaining to organize. At least one real page is required.");
   }
 
-  for (const item of items) {
-    if (item.isBlank) continue;
-    const fileIdx = Number(item.fileIndex) || 0;
-    const pageIdx = Number(item.pageIndex) || 0;
-    if (fileIdx < 0 || fileIdx >= srcDocs.length) {
-      throw new ToolError(`Invalid file index ${fileIdx}.`);
+  let realPageCount = 0;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (typeof item !== "object" || item === null) {
+      throw new ToolError(`Invalid page item at index ${i}: item must be an object.`);
     }
-    const src = srcDocs[fileIdx];
-    if (pageIdx < 0 || pageIdx >= src.getPageCount()) {
-      throw new ToolError(`Invalid page index ${pageIdx} for file ${fileNames[fileIdx]}.`);
+
+    validateRotation(item.rotation, i);
+
+    if (item.isBlank) {
+      continue;
     }
+
+    const fileIdx = validateFileIndex(item.fileIndex, i, srcDocs.length);
+    validatePageIndex(fileIdx, item.pageIndex, i, srcDocs, fileNames);
+    realPageCount++;
+  }
+
+  if (realPageCount === 0) {
+    throw new ToolError("No pages remaining to organize. At least one real page is required.");
   }
 }
 
