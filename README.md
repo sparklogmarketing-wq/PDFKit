@@ -80,10 +80,12 @@ Cuts a PDF into several files by page ranges or every N pages.
 |---|---|
 | Package | `@pdfkit/mod-split` |
 | Accepts | `application/pdf` (single file) |
-| Options | `mode` (`ranges` \| `every`), `ranges` (e.g. `"1-3,4-"`), `n` (pages per chunk) |
-| Output | `<name>-part1.pdf`, `<name>-part2.pdf`, … |
+| Options | `mode` (`ranges` \| `every` \| `size`), `ranges` (e.g. `"1-3,4-"`), `n` (pages per chunk), `maxSizeBytes` (default: 500,000 bytes / `DEFAULT_MAX_SIZE_BYTES`), `allowCompression` (boolean), `mergeAll` (boolean) |
+| Output | `<name>-part1.pdf`, `<name>-part2.pdf`, … or `<name>-merged.pdf` |
 | Library | `@cantoo/pdf-lib` |
 | Depends on | `@pdfkit/core` |
+
+> **Size mode & mergeAll constraints:** In `mode: "size"`, `maxSizeBytes` defaults to 500,000 bytes (shared between manifest and module). Individual pages that exceed `maxSizeBytes` are rejected with a `ToolError`. If `mergeAll: true` is requested alongside `mode: "size"`, the operation will throw a `ToolError` if merging the parts causes the resulting file to exceed `maxSizeBytes`.
 
 **Page range syntax** (shared with rotate via `parsePageSpec`):
 
