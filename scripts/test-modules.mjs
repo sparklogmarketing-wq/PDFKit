@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { PDFDocument } from "@cantoo/pdf-lib";
 import { parsePageSpec, ToolError } from "../packages/core/src/index.ts";
 import mergeMod from "../packages/mod-merge/src/index.ts";
-import splitMod from "../packages/mod-split/src/index.ts";
+import splitMod, { DEFAULT_MAX_SIZE_BYTES } from "../packages/mod-split/src/index.ts";
 import rotateMod from "../packages/mod-rotate/src/index.ts";
 import removeMod from "../packages/mod-remove/src/index.ts";
 import organizeMod from "../packages/mod-organize/src/index.ts";
@@ -204,6 +204,45 @@ test("mod-split", async (t) => {
       ], { mode: "size", maxSizeBytes: exactBytes - 1, allowCompression: true }, ctx),
       /Page 1 size.*exceeds the maximum allowed size/i
     );
+  });
+
+  await t.test("defaults: manifest and module expose the same default 500,000 bytes", async () => {
+    assert.equal(DEFAULT_MAX_SIZE_BYTES, 500000);
+    const sizeField = splitMod.manifest.fields.find((f) => f.key === "maxSizeBytes");
+    assert.ok(sizeField, "maxSizeBytes field exists in manifest");
+    assert.equal(sizeField.default, DEFAULT_MAX_SIZE_BYTES);
+
+    // Running with mode: "size" and no maxSizeBytes uses DEFAULT_MAX_SIZE_BYTES
+    const results = await splitMod.run([
+      { name: "sample.pdf", data: pdf },
+    ], { mode: "size" }, ctx);
+    assert.ok(results.length >= 1);
+    for (const res of results) {
+      assert.ok(res.data.byteLength <= DEFAULT_MAX_SIZE_BYTES);
+    }
+  });
+
+  await t.test("mergeAll with size mode: rejects when total size exceeds limit", async () => {
+    // 5-page PDF with small budget forces multiple parts, so mergeAll cannot fit within limit
+    await assert.rejects(
+      async () => await splitMod.run([
+        { name: "sample.pdf", data: pdf },
+      ], { mode: "size", maxSizeBytes: 1500, mergeAll: true }, ctx),
+      /Cannot merge all parts into a single PDF: total size exceeds the maximum size limit/i
+    );
+  });
+
+  await t.test("mergeAll with size mode: succeeds when total size fits within limit", async () => {
+    // 5-page PDF fits within 500,000 bytes
+    const results = await splitMod.run([
+      { name: "sample.pdf", data: pdf },
+    ], { mode: "size", maxSizeBytes: 500000, mergeAll: true }, ctx);
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "sample-merged.pdf");
+    assert.ok(results[0].data.byteLength <= 500000);
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 5);
   });
 });
 
