@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
 import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
-import { downloadFilesAsZip } from "../lib/downloadZip";
+import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
 import { formatPageRanges, parsePageRanges } from "../lib/pageRanges";
 import PdfZoomModal from "./PdfZoomModal";
@@ -130,7 +130,7 @@ export default function ExtractTool() {
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<{ name: string; url: string; size: number }[] | null>(null);
-  const [isZipping, setIsZipping] = useState<boolean>(false);
+  const { isZipping, zipError, downloadZip, clearZipError } = useZipDownload();
   const [cancelTask, setCancelTask] = useState<(() => void) | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -311,17 +311,10 @@ export default function ExtractTool() {
   }, [file, totalPages, extractMode, selectedPages, mergeAll, outputName]);
 
   const handleDownloadAllZip = useCallback(async () => {
-    if (!results || results.length === 0 || isZipping) return;
-    setIsZipping(true);
-    try {
-      const base = file?.name.replace(/\.pdf$/i, "") ?? "extracted";
-      await downloadFilesAsZip(results, `${base}-extracted.zip`);
-    } catch (err: any) {
-      setError("Failed to create ZIP: " + (err?.message || "Unknown error"));
-    } finally {
-      setIsZipping(false);
-    }
-  }, [results, isZipping, file]);
+    if (!results || results.length === 0) return;
+    const base = file?.name.replace(/\.pdf$/i, "") ?? "extracted";
+    await downloadZip(results, `${base}-extracted.zip`);
+  }, [results, file, downloadZip]);
 
   const handleReset = useCallback(() => {
     loadIdRef.current++;
@@ -336,8 +329,9 @@ export default function ExtractTool() {
     setPagesInput("");
     setResults(null);
     setError(null);
+    clearZipError();
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, []);
+  }, [clearZipError]);
 
   /* ── 1. Upload View ───────────────────────────────────────── */
   if (!file) {
@@ -442,6 +436,21 @@ export default function ExtractTool() {
             ? "Your extracted PDF is ready for download."
             : `${results.length} separate PDF files were successfully generated.`}
         </p>
+
+        {(zipError || error) && (
+          <div
+            role="alert"
+            className="alert-error"
+            style={{ maxWidth: 460, margin: "0 auto 1.5rem" }}
+          >
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <div>{zipError || error}</div>
+          </div>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxWidth: 360, margin: "0 auto" }}>
           {isSingle ? (

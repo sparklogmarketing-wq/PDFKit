@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
 import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
-import { downloadFilesAsZip } from "../lib/downloadZip";
+import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatPageRanges, parsePageRanges } from "../lib/pageRanges";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
@@ -337,7 +337,7 @@ export default function SplitTool() {
   cancelRef.current = cancel;
   const loadIdRef = useRef(0);
   const runIdRef = useRef(0);
-  const [isZipping, setIsZipping] = useState(false);
+  const { isZipping, zipError, downloadZip, clearZipError } = useZipDownload();
   const isRunning = progress !== null;
 
   /* cleanup urls and cancel active job on unmount */
@@ -347,17 +347,9 @@ export default function SplitTool() {
   }, [results]);
 
   async function handleDownloadAllZip() {
-    if (results.length === 0 || isZipping) return;
-    setIsZipping(true);
-    try {
-      const baseName = file ? file.name.replace(/\.pdf$/i, "") : "split_files";
-      await downloadFilesAsZip(results, `${baseName}_split.zip`);
-    } catch (err: any) {
-      console.error("Failed to generate zip:", err);
-      alert("Failed to generate zip archive: " + (err?.message || "Unknown error"));
-    } finally {
-      setIsZipping(false);
-    }
+    if (results.length === 0) return;
+    const baseName = file ? file.name.replace(/\.pdf$/i, "") : "split_files";
+    await downloadZip(results, `${baseName}_split.zip`);
   }
 
   /* ── File handling ──────────────────────────────────────── */
@@ -646,6 +638,7 @@ export default function SplitTool() {
     setAllowCompression(true);
     setResults([]);
     setError("");
+    clearZipError();
     setProgress(null);
     setStatusMsg("");
     setCancel(null);
@@ -729,6 +722,21 @@ export default function SplitTool() {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
           <strong style={{ color: "#065f46" }}>Split complete — {results.length} file{results.length !== 1 ? "s" : ""} ready</strong>
         </div>
+
+        {(zipError || error) && (
+          <div
+            role="alert"
+            className="alert-error"
+            style={{ marginBottom: "1rem" }}
+          >
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <div>{zipError || error}</div>
+          </div>
+        )}
 
         {activeTab === "size" && results.some((r) => r.size > (sizeUnit === "MB" ? Number(sizeValue) * 1024 * 1024 : Number(sizeValue) * 1024)) && (
           <div

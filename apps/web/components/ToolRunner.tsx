@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { FieldDef, OutputFile, ToolManifest } from "@pdfkit/core";
 import { runTool, isCancelledError } from "../lib/runTool";
-import { downloadFilesAsZip } from "../lib/downloadZip";
+import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import PdfThumbnailCard from "./PdfThumbnailCard";
 import PdfZoomModal from "./PdfZoomModal";
 
@@ -26,7 +26,7 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
   const [error, setError] = useState("");
   const [results, setResults] = useState<{ name: string; url: string; size: number }[]>([]);
   const [cancel, setCancel] = useState<(() => void) | null>(null);
-  const [isZipping, setIsZipping] = useState(false);
+  const { isZipping, zipError, downloadZip, clearZipError } = useZipDownload();
   const [isDragging, setIsDragging] = useState(false);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
@@ -47,16 +47,8 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
   }, [results]);
 
   async function handleDownloadAllZip() {
-    if (results.length === 0 || isZipping) return;
-    setIsZipping(true);
-    try {
-      await downloadFilesAsZip(results, `${manifest.id}_results.zip`);
-    } catch (err: any) {
-      console.error("Failed to generate zip:", err);
-      alert("Failed to generate zip archive: " + (err?.message || "Unknown error"));
-    } finally {
-      setIsZipping(false);
-    }
+    if (results.length === 0) return;
+    await downloadZip(results, `${manifest.id}_results.zip`);
   }
 
   function handleFileSelect(selectedFiles: FileList | File[] | null) {
@@ -71,6 +63,7 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
     }
 
     setError("");
+    clearZipError();
     if (manifest.multiple) {
       // Append files, avoiding duplicate names
       setFiles((prev) => {
@@ -214,6 +207,7 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
 
     const runId = ++runIdRef.current;
     setError("");
+    clearZipError();
     setResults([]);
     setProgress(0.05);
     setStatusMessage("Reading files...");
@@ -578,6 +572,16 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
       {/* Results / Download Section */}
       {results.length > 0 && files.length > 0 && (
         <div className="results-card">
+          {zipError && (
+            <div role="alert" className="alert-error">
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <div>{zipError}</div>
+            </div>
+          )}
           <div className="results-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
               <div className="success-badge">
