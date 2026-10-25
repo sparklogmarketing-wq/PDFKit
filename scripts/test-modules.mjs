@@ -1,7 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PDFDocument } from "@cantoo/pdf-lib";
-import { parsePageSpec, ToolError } from "../packages/core/src/index.ts";
+import {
+  parsePageSpec,
+  parsePageRanges as coreParsePageRanges,
+  formatPageRanges as coreFormatPageRanges,
+  formatPageIndices as coreFormatPageIndices,
+  PageRangeError,
+  ToolError,
+} from "../packages/core/src/index.ts";
 import mergeMod from "../packages/mod-merge/src/index.ts";
 import splitMod, { DEFAULT_MAX_SIZE_BYTES } from "../packages/mod-split/src/index.ts";
 import rotateMod from "../packages/mod-rotate/src/index.ts";
@@ -47,6 +54,89 @@ test("parsePageSpec", async (t) => {
     assert.throws(() => parsePageSpec("abc", 5), /Invalid page range/);
     assert.throws(() => parsePageSpec("6-7", 5), /outside 1-5/);
     assert.throws(() => parsePageSpec("4-2", 5), /outside 1-5/);
+  });
+
+  await t.test("table-driven edge case validation: 0, reversed, open, duplicates, whitespace, invalid tokens, multi-dash", () => {
+    // 1. Page 0
+    assert.throws(() => parsePageSpec("0", 5), (err) => {
+      assert.ok(err instanceof PageRangeError);
+      assert.ok(err instanceof ToolError);
+      assert.match(err.message, /outside 1-5/);
+      assert.equal(err.token, "0");
+      return true;
+    });
+
+    // 2. Reversed ranges (strict throws; lenient allows with allowReversed)
+    assert.throws(() => parsePageSpec("5-3", 5), (err) => {
+      assert.ok(err instanceof PageRangeError);
+      assert.match(err.message, /outside 1-5/);
+      assert.equal(err.token, "5-3");
+      return true;
+    });
+    const lenientReversed = coreParsePageRanges("5-3", 5, { mode: "lenient", allowReversed: true });
+    assert.deepEqual(lenientReversed, [3, 4, 5]);
+
+    // 3. Open ranges & bare dashes
+    assert.deepEqual(parsePageSpec("3-", 5), [2, 3, 4]);
+    assert.deepEqual(parsePageSpec("-2", 5), [0, 1]);
+    assert.throws(() => parsePageSpec("-", 5), /Invalid page range/);
+
+    // 4. Duplicates & out-of-order intervals
+    assert.deepEqual(parsePageSpec("1, 1, 3, 2-4, 2", 5), [0, 1, 2, 3]);
+
+    // 5. Whitespace handling around commas and dashes
+    assert.deepEqual(parsePageSpec("  1 - 2 ,  4 , 5 -  ", 5), [0, 1, 3, 4]);
+
+    // 6. Invalid tokens
+    assert.throws(() => parsePageSpec("1-a", 5), /Invalid page range/);
+    assert.throws(() => parsePageSpec("a-1", 5), /Invalid page range/);
+    assert.throws(() => parsePageSpec("xyz", 5), /Invalid page range/);
+
+    // 7. Multi-dash input
+    assert.throws(() => parsePageSpec("1-3-5", 5), (err) => {
+      assert.ok(err instanceof PageRangeError);
+      assert.match(err.message, /Invalid page range: "1-3-5"/);
+      assert.equal(err.token, "1-3-5");
+      return true;
+    });
+    assert.throws(() => parsePageSpec("--", 5), /Invalid page range/);
+    assert.throws(() => parsePageSpec("1--3", 5), /Invalid page range/);
+
+    // 8. Clamping in lenient mode vs error in strict mode
+    assert.throws(() => parsePageSpec("1-10", 5), /outside 1-5/);
+    const clamped = coreParsePageRanges("0-10", 5, { mode: "lenient", clamp: true });
+    assert.deepEqual(clamped, [1, 2, 3, 4, 5]);
+  });
+
+  await t.test("formatting round-trips for contiguous, sparse, and single ranges", () => {
+    // 1. Contiguous
+    const contiguous = [1, 2, 3, 4, 5];
+    const formattedContiguous = coreFormatPageRanges(contiguous);
+    assert.equal(formattedContiguous, "1-5");
+    assert.deepEqual(coreParsePageRanges(formattedContiguous, 5), contiguous);
+
+    // 2. Sparse
+    const sparse = [1, 3, 5, 7];
+    const formattedSparse = coreFormatPageRanges(sparse);
+    assert.equal(formattedSparse, "1, 3, 5, 7");
+    assert.deepEqual(coreParsePageRanges(formattedSparse, 7), sparse);
+
+    // 3. Mixed contiguous & sparse
+    const mixed = [1, 2, 3, 5, 7, 8, 9];
+    const formattedMixed = coreFormatPageRanges(mixed);
+    assert.equal(formattedMixed, "1-3, 5, 7-9");
+    assert.deepEqual(coreParsePageRanges(formattedMixed, 9), mixed);
+
+    // 4. Single page
+    assert.equal(coreFormatPageRanges([4]), "4");
+    assert.deepEqual(coreParsePageRanges("4", 5), [4]);
+
+    // 5. Empty
+    assert.equal(coreFormatPageRanges([]), "");
+    assert.deepEqual(coreParsePageRanges("", 5), []);
+
+    // 6. Zero-based index formatter
+    assert.equal(coreFormatPageIndices([0, 1, 2, 4]), "1-3, 5");
   });
 });
 

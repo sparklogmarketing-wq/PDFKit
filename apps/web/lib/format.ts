@@ -1,4 +1,4 @@
-import { formatPageRanges } from "./pageRanges.ts";
+import { formatPageIndices, formatPageRanges } from "./pageRanges.ts";
 
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -86,5 +86,5 @@ export function appendUniqueFiles(existing: readonly File[], incoming: readonly 
 }
 
 export function formatPagesToRangeString(pageIndices: readonly number[]): string {
-  return formatPageRanges(pageIndices.map((i) => i + 1));
+  return formatPageIndices(pageIndices);
 }
