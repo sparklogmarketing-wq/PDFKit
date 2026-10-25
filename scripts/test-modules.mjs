@@ -476,6 +476,58 @@ test("mod-remove", async (t) => {
     const doc = await PDFDocument.load(results[0].data);
     assert.equal(doc.getPageCount(), 3);
   });
+
+  await t.test("rejects empty pageIndices array", async () => {
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [] }, ctx),
+      /No pages selected for removal/
+    );
+  });
+
+  await t.test("rejects out-of-range and negative indices without partial removal", async () => {
+    // [0, 999] should not partially remove page 0
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [0, 999] }, ctx),
+      /Page index 999 is out of range for document with 5 pages/
+    );
+
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [-1, 2] }, ctx),
+      /Page index -1 is out of range for document with 5 pages/
+    );
+  });
+
+  await t.test("rejects string and non-integer indices", async () => {
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: ["0"] }, ctx),
+      /Invalid page index "0"/
+    );
+
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [0, "abc"] }, ctx),
+      /Invalid page index "abc"/
+    );
+
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [1.5] }, ctx),
+      /Invalid page index "1.5"/
+    );
+
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [NaN] }, ctx),
+      /Invalid page index "NaN"/
+    );
+  });
+
+  await t.test("deduplicates valid indices and removes exactly those pages", async () => {
+    // 5-page document, remove pages 1 and 3 with duplicates: [1, 1, 3, 3]
+    const results = await removeMod.run([{ name: "doc.pdf", data: pdf }], {
+      pageIndices: [1, 1, 3, 3],
+    }, ctx);
+    assert.equal(results.length, 1);
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 3);
+  });
 });
 
 test("mod-organize", async (t) => {
