@@ -39,4 +39,6 @@ export const manifest: ToolManifest = {
       default: "",
     },
   ],
+  status: "active",
+  related: ["split", "remove", "merge"],
 };

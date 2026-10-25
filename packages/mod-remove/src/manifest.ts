@@ -18,4 +18,6 @@ export const manifest: ToolManifest = {
       help: "Enter page numbers or ranges to remove.",
     },
   ],
+  status: "active",
+  related: ["extract", "split", "organize"],
 };
