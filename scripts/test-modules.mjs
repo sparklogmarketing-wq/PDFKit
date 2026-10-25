@@ -12,6 +12,59 @@ import "./test-cancellation.mjs";
 import "./test-pdf-cache-perf.mjs";
 import "./test-stale-async.mjs";
 
+/* ── Shared test helpers (mirrors ExtractTool.tsx logic) ────── */
+
+/** Format a list of 1-based page numbers into a compact range string. */
+function formatPageRanges(pages) {
+  if (pages.length === 0) return "";
+  const sorted = Array.from(new Set(pages)).sort((a, b) => a - b);
+  const ranges = [];
+  let start = sorted[0];
+  let prev = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    const cur = sorted[i];
+    if (cur === prev + 1) {
+      prev = cur;
+    } else {
+      ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+      start = cur;
+      prev = cur;
+    }
+  }
+  ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+  return ranges.join(", ");
+}
+
+/** Expand a single range token (e.g. "2-4") into page numbers. */
+function expandRangeToken(token, maxPages) {
+  const [startStr, endStr] = token.split("-");
+  const start = Math.max(1, Math.min(maxPages, Number(startStr?.trim()) || 1));
+  const end = endStr?.trim()
+    ? Math.max(1, Math.min(maxPages, Number(endStr.trim()) || maxPages))
+    : maxPages;
+  const [from, to] = start <= end ? [start, end] : [end, start];
+  const pages = [];
+  for (let p = from; p <= to; p++) pages.push(p);
+  return pages;
+}
+
+/** Parse a comma-separated page range string into a Set of 1-based page numbers. */
+function parsePageRanges(text, maxPages) {
+  const result = new Set();
+  if (!text?.trim()) return result;
+  for (const part of text.split(",")) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    if (trimmed.includes("-")) {
+      for (const p of expandRangeToken(trimmed, maxPages)) result.add(p);
+    } else {
+      const p = Number(trimmed);
+      if (p >= 1 && p <= maxPages) result.add(p);
+    }
+  }
+  return result;
+}
+
 async function createSamplePdf(pages = 3) {
   const doc = await PDFDocument.create();
   for (let i = 0; i < pages; i++) {
@@ -514,7 +567,7 @@ test("mod-remove", async (t) => {
     );
 
     await assert.rejects(
-      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [NaN] }, ctx),
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [Number.NaN] }, ctx),
       /Invalid page index "NaN"/
     );
   });
@@ -1016,54 +1069,6 @@ test("UI regression: ExtractTool selection and mode switching", async (t) => {
   let selectedPages = new Set([1, 2, 3, 4, 5]);
   let pagesInput = "1-5";
 
-  function formatPageRanges(pages) {
-    if (pages.length === 0) return "";
-    const sorted = Array.from(new Set(pages)).sort((a, b) => a - b);
-    const ranges = [];
-    let start = sorted[0];
-    let prev = sorted[0];
-
-    for (let i = 1; i < sorted.length; i++) {
-      const cur = sorted[i];
-      if (cur === prev + 1) {
-        prev = cur;
-      } else {
-        ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
-        start = cur;
-        prev = cur;
-      }
-    }
-    ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
-    return ranges.join(", ");
-  }
-
-  function parsePageRanges(text, maxPages) {
-    const result = new Set();
-    if (!text || !text.trim()) return result;
-    const parts = text.split(",");
-    for (const part of parts) {
-      const trimmed = part.trim();
-      if (!trimmed) continue;
-      if (trimmed.includes("-")) {
-        const [startStr, endStr] = trimmed.split("-");
-        const start = Math.max(1, Math.min(maxPages, Number(startStr?.trim()) || 1));
-        const end = endStr && endStr.trim()
-          ? Math.max(1, Math.min(maxPages, Number(endStr.trim()) || maxPages))
-          : maxPages;
-        const [from, to] = start <= end ? [start, end] : [end, start];
-        for (let p = from; p <= to; p++) {
-          result.add(p);
-        }
-      } else {
-        const p = Number(trimmed);
-        if (p >= 1 && p <= maxPages) {
-          result.add(p);
-        }
-      }
-    }
-    return result;
-  }
-
   function handleTogglePage(pageNum) {
     const base =
       extractMode === "all" && selectedPages.size !== totalPages
@@ -1158,5 +1163,3 @@ test("UI regression: ExtractTool selection and mode switching", async (t) => {
     assert.deepEqual(Array.from(selectedPages).sort((a, b) => a - b), [1, 4, 5]);
   });
 });
-
-
