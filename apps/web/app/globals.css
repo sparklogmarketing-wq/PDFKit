@@ -2651,6 +2651,25 @@ a {
   transform: scale(1.12);
 }
 
+.organize-icon-btn.move-left,
+.organize-icon-btn.move-right {
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.organize-icon-btn.move-left:not(:disabled):hover,
+.organize-icon-btn.move-right:not(:disabled):hover {
+  background: #f1f5f9;
+  color: var(--primary);
+  transform: scale(1.12);
+}
+
+.organize-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .organize-page-sheet {
   position: relative;
   width: 100%;

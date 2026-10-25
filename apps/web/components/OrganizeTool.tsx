@@ -55,6 +55,10 @@ interface OrganizePageCardProps {
   readonly file?: File;
   readonly isDragging: boolean;
   readonly isDropTarget: boolean;
+  readonly canMoveLeft?: boolean;
+  readonly canMoveRight?: boolean;
+  readonly onMoveLeft?: () => void;
+  readonly onMoveRight?: () => void;
   readonly onRotate: () => void;
   readonly onDelete: () => void;
   readonly onZoom: () => void;
@@ -76,6 +80,10 @@ function OrganizePageCard({
   file,
   isDragging,
   isDropTarget,
+  canMoveLeft,
+  canMoveRight,
+  onMoveLeft,
+  onMoveRight,
   onRotate,
   onDelete,
   onZoom,
@@ -104,6 +112,18 @@ function OrganizePageCard({
       ref={containerRef}
       className={`organize-page-wrapper ${isDragging ? "dragging" : ""} ${isDropTarget ? "drop-target" : ""}`}
       draggable
+      tabIndex={0}
+      role="group"
+      aria-label={`Page ${seqNumber}, ${item.isBlank ? "blank page" : "document page"}`}
+      onKeyDown={(e) => {
+        if (e.altKey && e.key === "ArrowLeft" && canMoveLeft) {
+          e.preventDefault();
+          onMoveLeft?.();
+        } else if (e.altKey && e.key === "ArrowRight" && canMoveRight) {
+          e.preventDefault();
+          onMoveRight?.();
+        }
+      }}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
@@ -164,11 +184,44 @@ function OrganizePageCard({
       >
         {/* Card Top Action Icons */}
         <div className="organize-card-top-actions">
+          <button
+            type="button"
+            className="organize-icon-btn move-left"
+            disabled={!canMoveLeft}
+            title={canMoveLeft ? "Move page earlier (Alt+Left)" : "Cannot move earlier"}
+            aria-label={`Move page ${seqNumber} earlier`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveLeft?.();
+            }}
+          >
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            className="organize-icon-btn move-right"
+            disabled={!canMoveRight}
+            title={canMoveRight ? "Move page later (Alt+Right)" : "Cannot move later"}
+            aria-label={`Move page ${seqNumber} later`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveRight?.();
+            }}
+          >
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+
           {!item.isBlank && (
             <button
               type="button"
               className="organize-icon-btn zoom"
               title="Zoom page"
+              aria-label={`Zoom page ${seqNumber}`}
               onClick={(e) => {
                 e.stopPropagation();
                 onZoom();
@@ -503,17 +556,22 @@ export default function OrganizeTool() {
     setDragOverPageIndex(index);
   }
 
+  function handleMovePage(fromIndex: number, toIndex: number) {
+    if (toIndex < 0 || toIndex >= pages.length || fromIndex === toIndex) return;
+    setPages((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }
+
   function handleCardDrop(e: React.DragEvent, dropIndex: number) {
     e.preventDefault();
     e.stopPropagation();
     const sourceIndex = draggedPageIndex;
     if (sourceIndex !== null && sourceIndex !== dropIndex) {
-      setPages((prev) => {
-        const next = [...prev];
-        const [moved] = next.splice(sourceIndex, 1);
-        next.splice(dropIndex, 0, moved);
-        return next;
-      });
+      handleMovePage(sourceIndex, dropIndex);
     }
     setDraggedPageIndex(null);
     setDragOverPageIndex(null);
@@ -970,6 +1028,10 @@ export default function OrganizeTool() {
                     file={fileEntry?.file}
                     isDragging={draggedPageIndex === idx}
                     isDropTarget={dragOverPageIndex === idx && draggedPageIndex !== idx}
+                    canMoveLeft={idx > 0}
+                    canMoveRight={idx < pages.length - 1}
+                    onMoveLeft={() => handleMovePage(idx, idx - 1)}
+                    onMoveRight={() => handleMovePage(idx, idx + 1)}
                     onRotate={() => handleRotatePage(idx)}
                     onDelete={() => handleDeletePage(idx)}
                     onZoom={() => {

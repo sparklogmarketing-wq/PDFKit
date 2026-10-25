@@ -136,11 +136,21 @@ function SelectablePageCard({
   return (
     <div
       ref={containerRef}
+      role="checkbox"
+      aria-checked={isSelected}
+      tabIndex={0}
+      aria-label={`Page ${pageNum}${isSelected ? ", selected" : ", not selected"}`}
       className={`split-page-thumb ${isSelected ? "selected" : ""}`}
       onClick={() => onToggle(pageNum)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggle(pageNum);
+        }
+      }}
     >
       <div className="split-page-thumb-top">
-        <div className={`split-page-check ${isSelected ? "checked" : ""}`}>
+        <div className={`split-page-check ${isSelected ? "checked" : ""}`} aria-hidden="true">
           {isSelected && (
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
@@ -155,8 +165,8 @@ function SelectablePageCard({
             e.stopPropagation();
             onZoom(file, pageNum);
           }}
-          title="Zoom page"
-          aria-label="Zoom page"
+          title={`Zoom page ${pageNum}`}
+          aria-label={`Zoom page ${pageNum}`}
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="8" />
@@ -234,6 +244,15 @@ function SingleDocumentPreview({ file, onZoom }: { file: File; onZoom: () => voi
           cursor: "pointer",
         }}
         onClick={onZoom}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onZoom();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label="Preview first page"
         title="Click to zoom preview"
       >
         {loading && (

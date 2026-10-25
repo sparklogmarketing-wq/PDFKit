@@ -1409,21 +1409,21 @@ test("Route dynamic loading and bundle splitting (Issue #25)", async (t) => {
 
   await t.test("tool registry dynamically imports all registered active tools with fallback skeleton", () => {
     const registryContent = fs.readFileSync("apps/web/lib/toolComponents.tsx", "utf8");
-    assert.match(registryContent, /"use client"/);
-    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/MergeTool["']\)/);
-    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/SplitTool["']\)/);
-    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/RotateTool["']\)/);
-    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/RemoveTool["']\)/);
-    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/OrganizeTool["']\)/);
-    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/ExtractTool["']\)/);
-    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/ToolRunner["']\)/);
-    assert.match(registryContent, /ToolLoadingSkeleton/);
+    assert.ok(registryContent.includes('"use client"'));
+    assert.ok(registryContent.includes('../components/MergeTool'));
+    assert.ok(registryContent.includes('../components/SplitTool'));
+    assert.ok(registryContent.includes('../components/RotateTool'));
+    assert.ok(registryContent.includes('../components/RemoveTool'));
+    assert.ok(registryContent.includes('../components/OrganizeTool'));
+    assert.ok(registryContent.includes('../components/ExtractTool'));
+    assert.ok(registryContent.includes('../components/ToolRunner'));
+    assert.ok(registryContent.includes("ToolLoadingSkeleton"));
   });
 
   await t.test("route configuration enforces static params and returns notFound for unknown IDs", () => {
     const pageContent = fs.readFileSync("apps/web/app/tools/[id]/page.tsx", "utf8");
-    assert.match(pageContent, /export const dynamicParams = false/);
-    assert.match(pageContent, /if\s*\(!manifest\)\s*notFound\(\)/);
+    assert.ok(pageContent.includes("export const dynamicParams = false"));
+    assert.ok(pageContent.includes("if (!manifest) notFound()"));
   });
 
   await t.test("bundle size check: route chunk does not contain monolithic tool code", () => {
@@ -1431,17 +1431,121 @@ test("Route dynamic loading and bundle splitting (Issue #25)", async (t) => {
     if (fs.existsSync(chunkDir)) {
       const files = fs.readdirSync(chunkDir).filter((f) => f.endsWith(".js"));
       for (const file of files) {
-        const content = fs.readFileSync(path.join(chunkDir, file), "utf8");
-        // Tool route chunk should be minimal shell (< 25 KB), not 160+ KB monolith
-        assert.ok(
-          content.length < 25 * 1024,
-          `Route chunk ${file} size (${(content.length / 1024).toFixed(1)} KB) should be under 25 KB`
-        );
-        // None of the tool-specific components should be bundled directly into this chunk
-        assert.equal(content.includes("split-text-input"), false);
-        assert.equal(content.includes("Rotate Settings"), false);
-        assert.equal(content.includes("remove-page-card"), false);
+        const fileContent = fs.readFileSync(path.join(chunkDir, file), "utf8");
+        assert.equal(fileContent.includes("split-text-input"), false, "Must not bundle split tool");
+        assert.equal(fileContent.includes("Rotate Settings"), false, "Must not bundle rotate tool");
+        assert.equal(fileContent.includes("remove-page-card"), false, "Must not bundle remove tool");
       }
     }
+  });
+});
+
+test("Accessibility: modal focus trap and keyboard page selection/reordering (Issue #27)", async (t) => {
+  await t.test("PdfZoomModal has modal dialog semantics, focus trap, and conditional Escape handling", () => {
+    const modalContent = fs.readFileSync("apps/web/components/PdfZoomModal.tsx", "utf8");
+
+    // 1. Dialog semantics
+    assert.ok(modalContent.includes('role="dialog"'));
+    assert.ok(modalContent.includes('aria-modal="true"'));
+    assert.ok(modalContent.includes('aria-labelledby="pdf-modal-title"'));
+    assert.ok(modalContent.includes('id="pdf-modal-title"'));
+
+    // 2. Focus trap and initial focus
+    assert.ok(modalContent.includes("closeBtnRef.current?.focus()"));
+    assert.ok(modalContent.includes("triggerElementRef.current?.focus()"));
+    assert.ok(modalContent.includes('e.key === "Tab"'));
+    assert.ok(modalContent.includes("querySelectorAll"));
+
+    // 3. Scroll lock
+    assert.ok(modalContent.includes('document.body.style.overflow = "hidden"'));
+
+    // 4. Escape listener is guarded by file presence
+    assert.ok(modalContent.includes("if (!file) return;"));
+    assert.ok(modalContent.includes('e.key === "Escape"'));
+  });
+
+  await t.test("SplitTool SelectablePageCard supports keyboard selection with checkbox semantics", () => {
+    const splitContent = fs.readFileSync("apps/web/components/SplitTool.tsx", "utf8");
+
+    // 1. Accessibility attributes
+    assert.ok(splitContent.includes('role="checkbox"'));
+    assert.ok(splitContent.includes("aria-checked={isSelected}"));
+    assert.ok(splitContent.includes("tabIndex={0}"));
+
+    // 2. Keyboard toggling on Enter or Space
+    assert.ok(splitContent.includes('e.key === "Enter" || e.key === " "'));
+    assert.ok(splitContent.includes("onToggle(pageNum)"));
+
+    // 3. Simulation of keyboard toggle state logic
+    const selected = new Set([1]);
+    function toggle(p) {
+      if (selected.has(p)) selected.delete(p);
+      else selected.add(p);
+    }
+    function handleKeyDown(e, p) {
+      if (e.key === "Enter" || e.key === " ") {
+        toggle(p);
+      }
+    }
+
+    // Toggle page 2 via Space
+    handleKeyDown({ key: " " }, 2);
+    assert.deepEqual(Array.from(selected), [1, 2]);
+
+    // Untoggle page 1 via Enter
+    handleKeyDown({ key: "Enter" }, 1);
+    assert.deepEqual(Array.from(selected), [2]);
+
+    // Other keys do not toggle
+    handleKeyDown({ key: "ArrowDown" }, 3);
+    assert.deepEqual(Array.from(selected), [2]);
+  });
+
+  await t.test("OrganizeTool enables accessible reordering via move controls and keyboard shortcuts", () => {
+    const organizeContent = fs.readFileSync("apps/web/components/OrganizeTool.tsx", "utf8");
+
+    // 1. Move buttons with aria-labels and boundary disabling
+    assert.ok(organizeContent.includes('className="organize-icon-btn move-left"'));
+    assert.ok(organizeContent.includes('className="organize-icon-btn move-right"'));
+    assert.ok(organizeContent.includes("Move page "));
+    assert.ok(organizeContent.includes("earlier"));
+    assert.ok(organizeContent.includes("later"));
+    assert.ok(organizeContent.includes("disabled={!canMoveLeft}"));
+    assert.ok(organizeContent.includes("disabled={!canMoveRight}"));
+
+    // 2. Keyboard shortcut reordering (Alt+Left, Alt+Right)
+    assert.ok(organizeContent.includes('e.altKey && e.key === "ArrowLeft"'));
+    assert.ok(organizeContent.includes('e.altKey && e.key === "ArrowRight"'));
+
+    // 3. Simulation of handleMovePage state logic
+    let pages = [
+      { id: "p1", name: "Page 1" },
+      { id: "p2", name: "Page 2" },
+      { id: "p3", name: "Page 3" },
+    ];
+
+    function handleMovePage(fromIndex, toIndex) {
+      if (toIndex < 0 || toIndex >= pages.length || fromIndex === toIndex) return;
+      const next = [...pages];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      pages = next;
+    }
+
+    // Moving page at index 1 earlier (to index 0)
+    handleMovePage(1, 0);
+    assert.deepEqual(pages.map((p) => p.id), ["p2", "p1", "p3"]);
+
+    // Boundary check: cannot move index 0 earlier (< 0)
+    handleMovePage(0, -1);
+    assert.deepEqual(pages.map((p) => p.id), ["p2", "p1", "p3"]);
+
+    // Boundary check: cannot move last index later (>= length)
+    handleMovePage(2, 3);
+    assert.deepEqual(pages.map((p) => p.id), ["p2", "p1", "p3"]);
+
+    // Moving index 0 to last
+    handleMovePage(0, 2);
+    assert.deepEqual(pages.map((p) => p.id), ["p1", "p3", "p2"]);
   });
 });

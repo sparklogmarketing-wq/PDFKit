@@ -38,6 +38,9 @@ export default function PdfZoomModal({
 }: PdfZoomModalProps) {
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const triggerElementRef = useRef<HTMLElement | null>(null);
 
   const renderPage = useCallback(async (signal?: AbortSignal) => {
     if (!file || !canvasRef.current) return;
@@ -62,20 +65,79 @@ export default function PdfZoomModal({
     };
   }, [renderPage]);
 
-  // Keyboard navigation: Escape to close, Left/Right arrows to rotate
+  // Capture triggering element before modal takes focus
   useEffect(() => {
+    if (file && typeof document !== "undefined") {
+      triggerElementRef.current = document.activeElement as HTMLElement | null;
+    }
+  }, [file]);
+
+  // Focus trap, initial focus, focus restoration, scroll lock, and keyboard handling
+  useEffect(() => {
+    if (!file) return;
+
+    // 1. Scroll lock on body
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    // 2. Set initial focus to close button
+    const focusTimer = setTimeout(() => {
+      closeBtnRef.current?.focus();
+    }, 30);
+
+    // 3. Keyboard handling & focus trap
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
+        e.preventDefault();
         onClose();
-      } else if (e.key === "ArrowLeft" && onRotateLeft && !isProtected && !isRotating) {
+        return;
+      }
+
+      if (e.key === "ArrowLeft" && onRotateLeft && !isProtected && !isRotating) {
+        e.preventDefault();
         onRotateLeft();
-      } else if (e.key === "ArrowRight" && onRotateRight && !isProtected && !isRotating) {
+        return;
+      }
+
+      if (e.key === "ArrowRight" && onRotateRight && !isProtected && !isRotating) {
+        e.preventDefault();
         onRotateRight();
+        return;
+      }
+
+      if (e.key === "Tab") {
+        const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable && focusable.length > 0) {
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+
+          if (e.shiftKey) {
+            if (document.activeElement === first || !dialogRef.current?.contains(document.activeElement)) {
+              e.preventDefault();
+              last.focus();
+            }
+          } else {
+            if (document.activeElement === last || !dialogRef.current?.contains(document.activeElement)) {
+              e.preventDefault();
+              first.focus();
+            }
+          }
+        }
       }
     }
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, onRotateLeft, onRotateRight, isProtected, isRotating]);
+
+    return () => {
+      clearTimeout(focusTimer);
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+      // Restore focus to triggering element
+      triggerElementRef.current?.focus();
+    };
+  }, [file, onClose, onRotateLeft, onRotateRight, isProtected, isRotating]);
 
   if (!file) return null;
 
@@ -105,9 +167,12 @@ export default function PdfZoomModal({
         }}
       />
       <dialog
+        ref={dialogRef}
         open
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pdf-modal-title"
         className="pdf-modal-container"
-        aria-label={`Preview of ${file.name} - Page ${displayNum}`}
         style={{
           width: "92vw",
           maxWidth: "960px",
@@ -144,7 +209,7 @@ export default function PdfZoomModal({
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
-            <span className="pdf-modal-filename" title={file.name}>
+            <span id="pdf-modal-title" className="pdf-modal-filename" title={file.name}>
               {file.name}
             </span>
             <span
@@ -282,11 +347,12 @@ export default function PdfZoomModal({
             )}
 
             <button
+              ref={closeBtnRef}
               type="button"
               className="modal-close-btn"
               onClick={onClose}
               title="Close preview (Esc)"
-              aria-label="Close"
+              aria-label="Close preview modal"
             >
               &times;
             </button>
