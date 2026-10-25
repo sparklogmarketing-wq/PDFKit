@@ -8,6 +8,26 @@ export interface RemovePagesOptions {
   readonly outputFileName?: string;
 }
 
+export function validatePageIndices(indices: unknown, total: number): number[] {
+  if (!Array.isArray(indices)) {
+    throw new ToolError("Invalid pageIndices: must be an array.");
+  }
+  if (indices.length === 0) {
+    throw new ToolError("No pages selected for removal.");
+  }
+  for (const idx of indices) {
+    if (typeof idx !== "number" || !Number.isInteger(idx)) {
+      throw new ToolError(`Invalid page index "${idx}". Page indices must be integers.`);
+    }
+    if (idx < 0 || idx >= total) {
+      throw new ToolError(
+        `Page index ${idx} is out of range for document with ${total} pages (valid indices are 0 to ${total - 1}).`
+      );
+    }
+  }
+  return [...indices];
+}
+
 const mod: ToolModule<RemovePagesOptions> = {
   manifest,
   async run([file], opts, ctx) {
@@ -24,8 +44,8 @@ const mod: ToolModule<RemovePagesOptions> = {
     }
 
     let removeIndices: number[] = [];
-    if (opts.pageIndices && opts.pageIndices.length > 0) {
-      removeIndices = [...opts.pageIndices].filter((idx) => idx >= 0 && idx < total);
+    if (opts.pageIndices !== undefined) {
+      removeIndices = validatePageIndices(opts.pageIndices, total);
     } else if (opts.pages && opts.pages.trim()) {
       removeIndices = parsePageSpec(opts.pages, total);
     } else {

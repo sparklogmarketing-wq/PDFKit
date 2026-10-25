@@ -16,6 +16,7 @@ interface ToolResultsViewProps {
   readonly onReset: () => void;
   readonly onDownloadZip?: () => void;
   readonly isZipping?: boolean;
+  readonly error?: string | null;
 }
 
 export default function ToolResultsView({
@@ -26,6 +27,7 @@ export default function ToolResultsView({
   onReset,
   onDownloadZip,
   isZipping = false,
+  error = null,
 }: ToolResultsViewProps) {
   const resultFile = results[0];
   if (!resultFile) return null;
@@ -68,6 +70,21 @@ export default function ToolResultsView({
         <p style={{ color: "var(--text-secondary)", fontSize: "0.9375rem", marginBottom: "2rem" }}>
           {subtitle}
         </p>
+
+        {error && (
+          <div
+            role="alert"
+            className="alert-error"
+            style={{ maxWidth: 520, margin: "0 auto 1.5rem" }}
+          >
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <div>{error}</div>
+          </div>
+        )}
 
         {results.length > 1 && onDownloadZip && (
           <div style={{ marginBottom: "2rem" }}>

@@ -37,5 +37,7 @@ export const manifest: ToolManifest = {
       help: "Pages or ranges that will remain unchanged.",
     },
   ],
+  status: "active",
+  related: ["organize", "split", "merge"],
 };
 

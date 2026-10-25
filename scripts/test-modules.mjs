@@ -11,6 +11,10 @@ import extractMod from "../packages/mod-extract/src/index.ts";
 import "./test-cancellation.mjs";
 import "./test-pdf-cache-perf.mjs";
 import "./test-stale-async.mjs";
+import "./test-download-zip.mjs";
+import "./test-duplicate-files.mjs";
+import "./test-manifests.mjs";
+import { formatPageRanges, parsePageRanges } from "../apps/web/lib/pageRanges.ts";
 
 async function createSamplePdf(pages = 3) {
   const doc = await PDFDocument.create();
@@ -473,6 +477,58 @@ test("mod-remove", async (t) => {
     }, ctx);
     assert.equal(results.length, 1);
     assert.equal(results[0].name, "clean-report.pdf");
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 3);
+  });
+
+  await t.test("rejects empty pageIndices array", async () => {
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [] }, ctx),
+      /No pages selected for removal/
+    );
+  });
+
+  await t.test("rejects out-of-range and negative indices without partial removal", async () => {
+    // [0, 999] should not partially remove page 0
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [0, 999] }, ctx),
+      /Page index 999 is out of range for document with 5 pages/
+    );
+
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [-1, 2] }, ctx),
+      /Page index -1 is out of range for document with 5 pages/
+    );
+  });
+
+  await t.test("rejects string and non-integer indices", async () => {
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: ["0"] }, ctx),
+      /Invalid page index "0"/
+    );
+
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [0, "abc"] }, ctx),
+      /Invalid page index "abc"/
+    );
+
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [1.5] }, ctx),
+      /Invalid page index "1.5"/
+    );
+
+    await assert.rejects(
+      async () => await removeMod.run([{ name: "doc.pdf", data: pdf }], { pageIndices: [Number.NaN] }, ctx),
+      /Invalid page index "NaN"/
+    );
+  });
+
+  await t.test("deduplicates valid indices and removes exactly those pages", async () => {
+    // 5-page document, remove pages 1 and 3 with duplicates: [1, 1, 3, 3]
+    const results = await removeMod.run([{ name: "doc.pdf", data: pdf }], {
+      pageIndices: [1, 1, 3, 3],
+    }, ctx);
+    assert.equal(results.length, 1);
     const doc = await PDFDocument.load(results[0].data);
     assert.equal(doc.getPageCount(), 3);
   });
@@ -955,3 +1011,106 @@ test("UI regression: OrganizeTool blank page validation and deletion down to zer
   });
 });
 
+// ─────────────────────────────────────────────────────────────
+// UI regression: ExtractTool selection and mode switching (Issue #20)
+// ─────────────────────────────────────────────────────────────
+test("UI regression: ExtractTool selection and mode switching", async (t) => {
+  const totalPages = 5;
+  let extractMode = "all";
+  let selectedPages = new Set([1, 2, 3, 4, 5]);
+  let pagesInput = "1-5";
+
+  function handleTogglePage(pageNum) {
+    const base =
+      extractMode === "all" && selectedPages.size !== totalPages
+        ? new Set(Array.from({ length: totalPages }, (_, i) => i + 1))
+        : selectedPages;
+    const next = new Set(base);
+    if (next.has(pageNum)) {
+      next.delete(pageNum);
+    } else {
+      next.add(pageNum);
+    }
+    selectedPages = next;
+    pagesInput = formatPageRanges(Array.from(next));
+    extractMode = "select";
+  }
+
+  function handleSelectAllPagesMode() {
+    extractMode = "all";
+    const all = new Set(Array.from({ length: totalPages }, (_, i) => i + 1));
+    selectedPages = all;
+    pagesInput = formatPageRanges(Array.from(all));
+  }
+
+  function handleCustomSelectMode() {
+    extractMode = "select";
+  }
+
+  function handlePagesInputChange(val) {
+    pagesInput = val;
+    selectedPages = parsePageRanges(val, totalPages);
+    extractMode = "select";
+  }
+
+  await t.test("clicking thumbnail in all mode switches to select mode and deselects clicked card", () => {
+    // Start in "all" mode with all pages selected
+    handleSelectAllPagesMode();
+    assert.equal(extractMode, "all");
+    assert.equal(selectedPages.size, 5);
+    assert.equal(pagesInput, "1-5");
+
+    // Click card 3
+    handleTogglePage(3);
+
+    // Mode must immediately switch to select, card 3 deselected, range input updated
+    assert.equal(extractMode, "select");
+    assert.equal(selectedPages.has(3), false);
+    assert.equal(selectedPages.size, 4);
+    assert.equal(pagesInput, "1-2, 4-5");
+
+    // Click card 1
+    handleTogglePage(1);
+    assert.equal(extractMode, "select");
+    assert.equal(selectedPages.has(1), false);
+    assert.equal(selectedPages.size, 3);
+    assert.equal(pagesInput, "2, 4-5");
+  });
+
+  await t.test("switching from select to all resets selection to all pages and syncs range input", () => {
+    // Currently only pages 2, 4, 5 selected in select mode
+    assert.equal(extractMode, "select");
+    assert.equal(selectedPages.size, 3);
+
+    // Switch to "all" mode
+    handleSelectAllPagesMode();
+    assert.equal(extractMode, "all");
+    assert.equal(selectedPages.size, 5);
+    assert.equal(pagesInput, "1-5");
+    assert.deepEqual(Array.from(selectedPages).sort((a, b) => a - b), [1, 2, 3, 4, 5]);
+  });
+
+  await t.test("switching from all mode to select mode preserves visible selection without hidden changes", () => {
+    handleSelectAllPagesMode();
+    assert.equal(extractMode, "all");
+    assert.equal(selectedPages.size, 5);
+
+    // User clicks "Select pages" tab
+    handleCustomSelectMode();
+    assert.equal(extractMode, "select");
+    assert.equal(selectedPages.size, 5);
+    assert.equal(pagesInput, "1-5");
+    assert.deepEqual(Array.from(selectedPages).sort((a, b) => a - b), [1, 2, 3, 4, 5]);
+  });
+
+  await t.test("typing into pages input switches mode to select and synchronizes selectedPages", () => {
+    handleSelectAllPagesMode();
+    assert.equal(extractMode, "all");
+
+    // User types "1, 4-5"
+    handlePagesInputChange("1, 4-5");
+    assert.equal(extractMode, "select");
+    assert.equal(selectedPages.size, 3);
+    assert.deepEqual(Array.from(selectedPages).sort((a, b) => a - b), [1, 4, 5]);
+  });
+});

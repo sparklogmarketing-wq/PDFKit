@@ -4,8 +4,9 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { renderPdfPage, loadPdfPagesMap } from "../lib/pdfjs";
 import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
-import { downloadFilesAsZip } from "../lib/downloadZip";
+import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
+import { appendUniqueFiles } from "../lib/format";
 import PdfZoomModal from "./PdfZoomModal";
 import ToolResultsView from "./ToolResultsView";
 import ToolProgressBar from "./ToolProgressBar";
@@ -855,7 +856,7 @@ export default function RotateTool() {
   const [error, setError] = useState("");
   const [results, setResults] = useState<{ name: string; url: string; size: number }[]>([]);
   const [cancel, setCancel] = useState<(() => void) | null>(null);
-  const [isZipping, setIsZipping] = useState(false);
+  const { isZipping, zipError, downloadZip, clearZipError } = useZipDownload();
   const isRunning = progress !== null;
 
   const cancelRef = useRef<(() => void) | null>(null);
@@ -936,13 +937,10 @@ export default function RotateTool() {
     setResults([]);
     setProgress(null);
 
-    const updatedFiles = append
-      ? [...files, ...arr.filter((af) => !files.some((ef) => ef.name === af.name))]
-      : arr;
-
+    const updatedFiles = append ? appendUniqueFiles(files, arr) : appendUniqueFiles([], arr);
     setFiles(updatedFiles);
 
-    const newPagesMap = await loadPdfPagesMap(arr, filePagesMap);
+    const newPagesMap = await loadPdfPagesMap(updatedFiles, filePagesMap);
     if (loadId !== loadIdRef.current) return;
     setFilePagesMap(newPagesMap);
 
@@ -982,6 +980,7 @@ export default function RotateTool() {
     setNotRotatePagesInput("");
     setResults([]);
     setError("");
+    clearZipError();
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -1092,16 +1091,8 @@ export default function RotateTool() {
   }
 
   async function handleDownloadAllZip() {
-    if (results.length === 0 || isZipping) return;
-    setIsZipping(true);
-    try {
-      await downloadFilesAsZip(results, "rotated_documents.zip");
-    } catch (err: any) {
-      console.error("Zip error:", err);
-      alert("Failed to create ZIP: " + (err?.message || "Unknown error"));
-    } finally {
-      setIsZipping(false);
-    }
+    if (results.length === 0) return;
+    await downloadZip(results, "rotated_documents.zip");
   }
 
   /* ── RENDER: Results View ────────────────────────────────── */
@@ -1119,6 +1110,7 @@ export default function RotateTool() {
         onReset={clearAllFiles}
         onDownloadZip={() => { void handleDownloadAllZip(); }}
         isZipping={isZipping}
+        error={zipError}
       />
     );
   }

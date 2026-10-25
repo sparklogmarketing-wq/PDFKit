@@ -418,10 +418,10 @@ export default function MergeTool() {
     setResults([]);
     setProgress(null);
 
-    const updated = append ? appendUniqueFiles(files, pdfs) : pdfs;
+    const updated = append ? appendUniqueFiles(files, pdfs) : appendUniqueFiles([], pdfs);
     setFiles(updated);
 
-    const newPages = await loadPdfPagesMap(pdfs, filePagesMap);
+    const newPages = await loadPdfPagesMap(updated, filePagesMap);
     if (loadId !== loadIdRef.current) return;
     setFilePagesMap(newPages);
   }

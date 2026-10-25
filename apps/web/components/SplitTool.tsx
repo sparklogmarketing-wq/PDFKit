@@ -4,7 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
 import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
-import { downloadFilesAsZip } from "../lib/downloadZip";
+import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
+import { formatPageRanges, parsePageRanges } from "../lib/pageRanges";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
 
@@ -28,56 +29,6 @@ const RANGE_COLORS = [
   "#7c3aed", "#059669", "#d97706", "#dc2626",
   "#0284c7", "#7c3aed", "#be185d", "#4f46e5",
 ];
-
-/* ── Helper: Parse range string into set of numbers ───────── */
-function parsePageRanges(text: string, maxPages: number): Set<number> {
-  const result = new Set<number>();
-  if (!text || !text.trim()) return result;
-  const parts = text.split(",");
-  for (const part of parts) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
-    if (trimmed.includes("-")) {
-      const [startStr, endStr] = trimmed.split("-");
-      const start = Math.max(1, Math.min(maxPages, Number(startStr.trim()) || 1));
-      const end = endStr && endStr.trim()
-        ? Math.max(1, Math.min(maxPages, Number(endStr.trim()) || maxPages))
-        : maxPages;
-      const [from, to] = start <= end ? [start, end] : [end, start];
-      for (let p = from; p <= to; p++) {
-        result.add(p);
-      }
-    } else {
-      const p = Number(trimmed);
-      if (p >= 1 && p <= maxPages) {
-        result.add(p);
-      }
-    }
-  }
-  return result;
-}
-
-/* ── Helper: Format array of page numbers to range string ─── */
-function formatPageRanges(pages: number[]): string {
-  if (pages.length === 0) return "";
-  const sorted = Array.from(new Set(pages)).sort((a, b) => a - b);
-  const ranges: string[] = [];
-  let start = sorted[0];
-  let prev = sorted[0];
-
-  for (let i = 1; i < sorted.length; i++) {
-    const cur = sorted[i];
-    if (cur === prev + 1) {
-      prev = cur;
-    } else {
-      ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
-      start = cur;
-      prev = cur;
-    }
-  }
-  ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
-  return ranges.join(",");
-}
 
 /* ── Tiny page thumbnail for Range Mode ───────────────────── */
 function PageThumb({
@@ -386,7 +337,7 @@ export default function SplitTool() {
   cancelRef.current = cancel;
   const loadIdRef = useRef(0);
   const runIdRef = useRef(0);
-  const [isZipping, setIsZipping] = useState(false);
+  const { isZipping, zipError, downloadZip, clearZipError } = useZipDownload();
   const isRunning = progress !== null;
 
   /* cleanup urls and cancel active job on unmount */
@@ -396,17 +347,9 @@ export default function SplitTool() {
   }, [results]);
 
   async function handleDownloadAllZip() {
-    if (results.length === 0 || isZipping) return;
-    setIsZipping(true);
-    try {
-      const baseName = file ? file.name.replace(/\.pdf$/i, "") : "split_files";
-      await downloadFilesAsZip(results, `${baseName}_split.zip`);
-    } catch (err: any) {
-      console.error("Failed to generate zip:", err);
-      alert("Failed to generate zip archive: " + (err?.message || "Unknown error"));
-    } finally {
-      setIsZipping(false);
-    }
+    if (results.length === 0) return;
+    const baseName = file ? file.name.replace(/\.pdf$/i, "") : "split_files";
+    await downloadZip(results, `${baseName}_split.zip`);
   }
 
   /* ── File handling ──────────────────────────────────────── */
@@ -695,6 +638,7 @@ export default function SplitTool() {
     setAllowCompression(true);
     setResults([]);
     setError("");
+    clearZipError();
     setProgress(null);
     setStatusMsg("");
     setCancel(null);
@@ -778,6 +722,21 @@ export default function SplitTool() {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
           <strong style={{ color: "#065f46" }}>Split complete — {results.length} file{results.length !== 1 ? "s" : ""} ready</strong>
         </div>
+
+        {(zipError || error) && (
+          <div
+            role="alert"
+            className="alert-error"
+            style={{ marginBottom: "1rem" }}
+          >
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <div>{zipError || error}</div>
+          </div>
+        )}
 
         {activeTab === "size" && results.some((r) => r.size > (sizeUnit === "MB" ? Number(sizeValue) * 1024 * 1024 : Number(sizeValue) * 1024)) && (
           <div

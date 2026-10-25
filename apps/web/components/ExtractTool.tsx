@@ -4,61 +4,13 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
 import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
-import { downloadFilesAsZip } from "../lib/downloadZip";
+import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
+import { formatPageRanges, parsePageRanges } from "../lib/pageRanges";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
 
 type ExtractMode = "select" | "all";
-
-/* ── Outer-scope pure helpers to satisfy SonarCloud ─────────── */
-function parsePageRanges(text: string, maxPages: number): Set<number> {
-  const result = new Set<number>();
-  if (!text || !text.trim()) return result;
-  const parts = text.split(",");
-  for (const part of parts) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
-    if (trimmed.includes("-")) {
-      const [startStr, endStr] = trimmed.split("-");
-      const start = Math.max(1, Math.min(maxPages, Number(startStr?.trim()) || 1));
-      const end = endStr && endStr.trim()
-        ? Math.max(1, Math.min(maxPages, Number(endStr.trim()) || maxPages))
-        : maxPages;
-      const [from, to] = start <= end ? [start, end] : [end, start];
-      for (let p = from; p <= to; p++) {
-        result.add(p);
-      }
-    } else {
-      const p = Number(trimmed);
-      if (p >= 1 && p <= maxPages) {
-        result.add(p);
-      }
-    }
-  }
-  return result;
-}
-
-function formatPageRanges(pages: number[]): string {
-  if (pages.length === 0) return "";
-  const sorted = Array.from(new Set(pages)).sort((a, b) => a - b);
-  const ranges: string[] = [];
-  let start = sorted[0];
-  let prev = sorted[0];
-
-  for (let i = 1; i < sorted.length; i++) {
-    const cur = sorted[i];
-    if (cur === prev + 1) {
-      prev = cur;
-    } else {
-      ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
-      start = cur;
-      prev = cur;
-    }
-  }
-  ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
-  return ranges.join(", ");
-}
 
 /* ── Thumbnail Card Component ───────────────────────────────── */
 interface ExtractPageThumbProps {
@@ -178,7 +130,7 @@ export default function ExtractTool() {
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<{ name: string; url: string; size: number }[] | null>(null);
-  const [isZipping, setIsZipping] = useState<boolean>(false);
+  const { isZipping, zipError, downloadZip, clearZipError } = useZipDownload();
   const [cancelTask, setCancelTask] = useState<(() => void) | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -239,7 +191,11 @@ export default function ExtractTool() {
   const handleTogglePage = useCallback(
     (pageNum: number) => {
       setSelectedPages((prev) => {
-        const next = new Set(prev);
+        const base =
+          extractMode === "all" && prev.size !== totalPages
+            ? new Set(Array.from({ length: totalPages }, (_, i) => i + 1))
+            : prev;
+        const next = new Set(base);
         if (next.has(pageNum)) {
           next.delete(pageNum);
         } else {
@@ -248,8 +204,9 @@ export default function ExtractTool() {
         setPagesInput(formatPageRanges(Array.from(next)));
         return next;
       });
+      setExtractMode("select");
     },
-    []
+    [extractMode, totalPages]
   );
 
   const handleSelectAll = useCallback(() => {
@@ -259,7 +216,7 @@ export default function ExtractTool() {
       all.add(i);
     }
     setSelectedPages(all);
-    setPagesInput(`1-${totalPages}`);
+    setPagesInput(formatPageRanges(Array.from(all)));
   }, [totalPages]);
 
   const handleDeselectAll = useCallback(() => {
@@ -267,11 +224,27 @@ export default function ExtractTool() {
     setPagesInput("");
   }, []);
 
+  const handleSelectAllPagesMode = useCallback(() => {
+    setExtractMode("all");
+    if (!totalPages) return;
+    const all = new Set<number>();
+    for (let i = 1; i <= totalPages; i++) {
+      all.add(i);
+    }
+    setSelectedPages(all);
+    setPagesInput(formatPageRanges(Array.from(all)));
+  }, [totalPages]);
+
+  const handleCustomSelectMode = useCallback(() => {
+    setExtractMode("select");
+  }, []);
+
   const handlePagesInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       setPagesInput(val);
       setSelectedPages(parsePageRanges(val, totalPages));
+      setExtractMode("select");
     },
     [totalPages]
   );
@@ -338,17 +311,10 @@ export default function ExtractTool() {
   }, [file, totalPages, extractMode, selectedPages, mergeAll, outputName]);
 
   const handleDownloadAllZip = useCallback(async () => {
-    if (!results || results.length === 0 || isZipping) return;
-    setIsZipping(true);
-    try {
-      const base = file?.name.replace(/\.pdf$/i, "") ?? "extracted";
-      await downloadFilesAsZip(results, `${base}-extracted.zip`);
-    } catch (err: any) {
-      setError("Failed to create ZIP: " + (err?.message || "Unknown error"));
-    } finally {
-      setIsZipping(false);
-    }
-  }, [results, isZipping, file]);
+    if (!results || results.length === 0) return;
+    const base = file?.name.replace(/\.pdf$/i, "") ?? "extracted";
+    await downloadZip(results, `${base}-extracted.zip`);
+  }, [results, file, downloadZip]);
 
   const handleReset = useCallback(() => {
     loadIdRef.current++;
@@ -363,8 +329,9 @@ export default function ExtractTool() {
     setPagesInput("");
     setResults(null);
     setError(null);
+    clearZipError();
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, []);
+  }, [clearZipError]);
 
   /* ── 1. Upload View ───────────────────────────────────────── */
   if (!file) {
@@ -470,6 +437,21 @@ export default function ExtractTool() {
             : `${results.length} separate PDF files were successfully generated.`}
         </p>
 
+        {(zipError || error) && (
+          <div
+            role="alert"
+            className="alert-error"
+            style={{ maxWidth: 460, margin: "0 auto 1.5rem" }}
+          >
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <div>{zipError || error}</div>
+          </div>
+        )}
+
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxWidth: 360, margin: "0 auto" }}>
           {isSingle ? (
             <a
@@ -500,7 +482,7 @@ export default function ExtractTool() {
   }
 
   /* ── 3. Main Workspace ────────────────────────────────────── */
-  const selectedCount = extractMode === "all" ? totalPages : selectedPages.size;
+  const selectedCount = selectedPages.size;
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   return (
@@ -587,7 +569,7 @@ export default function ExtractTool() {
                 key={pageNum}
                 file={file}
                 pageNum={pageNum}
-                isSelected={extractMode === "all" || selectedPages.has(pageNum)}
+                isSelected={selectedPages.has(pageNum)}
                 onToggle={handleTogglePage}
                 onZoom={(f, num) => setZoomPage(num)}
               />
@@ -610,14 +592,14 @@ export default function ExtractTool() {
               <button
                 type="button"
                 className={`split-submode-btn ${extractMode === "select" ? "active" : ""}`}
-                onClick={() => setExtractMode("select")}
+                onClick={handleCustomSelectMode}
               >
                 Select pages
               </button>
               <button
                 type="button"
                 className={`split-submode-btn ${extractMode === "all" ? "active" : ""}`}
-                onClick={() => setExtractMode("all")}
+                onClick={handleSelectAllPagesMode}
               >
                 Extract all pages
               </button>

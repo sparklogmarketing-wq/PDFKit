@@ -7,8 +7,10 @@ import RotateTool from "../../../components/RotateTool";
 import RemoveTool from "../../../components/RemoveTool";
 import OrganizeTool from "../../../components/OrganizeTool";
 import ExtractTool from "../../../components/ExtractTool";
+import type { ToolManifest } from "@pdfkit/core";
 import { ToolIcon } from "../../../components/ToolIcon";
 import { manifests } from "../../../lib/registry";
+import { getRelatedTools } from "../../../lib/relatedTools";
 
 export const dynamicParams = false;
 
@@ -22,11 +24,8 @@ export default async function ToolPage({ params }: { readonly params: Promise<{ 
   if (!manifest) notFound();
 
   const categoryLabel = manifest.category;
-  const isActive = (manifest as any).status === "active";
-
-  const relatedTools = manifests
-    .filter((m) => m.id !== id && (m.category === manifest.category || (m as any).status === "active"))
-    .slice(0, 4);
+  const isActive = manifest.status === "active";
+  const relatedTools = getRelatedTools(manifest, manifests);
 
   // Resolve tool component based on id to avoid nested ternary
   let toolComponent: React.ReactNode;
@@ -87,7 +86,7 @@ export default async function ToolPage({ params }: { readonly params: Promise<{ 
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(16rem, 1fr))", gap: "1rem" }}>
             {relatedTools.map((t) => {
-              const tIsActive = (t as any).status === "active";
+              const tIsActive = t.status === "active";
               return (
                 <Link
                   key={t.id}

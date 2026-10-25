@@ -39,3 +39,8 @@ Shared (non-tool) packages to add next: `packages/viewer` (pdfjs React viewer), 
 - **Blank Page Rotation**: Rotation angle (`0, 90, 180, 270`) on blank items is fully preserved and applied to the generated PDF page and UI canvas.
 - **Relative Position Preservation**: Reordering files, sorting (A-Z, Z-A, 1-9, 9-1), interleaving, or removing files/pages preserves inserted blank pages at their relative positions (start, middle, end) via `reinsertBlanksAtRelativePositions`.
 
+### Remove Module (`packages/mod-remove`)
+- **Strict Page Index Validation**: When providing `opts.pageIndices`, every element must be an integer within `[0, total - 1]`. Any out-of-range, negative, non-integer, or non-numeric index immediately rejects the request with an actionable `ToolError`.
+- **Atomic Operations**: No silent filtering or partial page removals occur. Deduplication happens only after every index passes validation.
+
+
