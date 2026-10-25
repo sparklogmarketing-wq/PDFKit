@@ -6,59 +6,11 @@ import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
+import { formatPageRanges, parsePageRanges } from "../lib/pageRanges";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
 
 type ExtractMode = "select" | "all";
-
-/* ── Outer-scope pure helpers to satisfy SonarCloud ─────────── */
-function parsePageRanges(text: string, maxPages: number): Set<number> {
-  const result = new Set<number>();
-  if (!text || !text.trim()) return result;
-  const parts = text.split(",");
-  for (const part of parts) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
-    if (trimmed.includes("-")) {
-      const [startStr, endStr] = trimmed.split("-");
-      const start = Math.max(1, Math.min(maxPages, Number(startStr?.trim()) || 1));
-      const end = endStr && endStr.trim()
-        ? Math.max(1, Math.min(maxPages, Number(endStr.trim()) || maxPages))
-        : maxPages;
-      const [from, to] = start <= end ? [start, end] : [end, start];
-      for (let p = from; p <= to; p++) {
-        result.add(p);
-      }
-    } else {
-      const p = Number(trimmed);
-      if (p >= 1 && p <= maxPages) {
-        result.add(p);
-      }
-    }
-  }
-  return result;
-}
-
-function formatPageRanges(pages: number[]): string {
-  if (pages.length === 0) return "";
-  const sorted = Array.from(new Set(pages)).sort((a, b) => a - b);
-  const ranges: string[] = [];
-  let start = sorted[0];
-  let prev = sorted[0];
-
-  for (let i = 1; i < sorted.length; i++) {
-    const cur = sorted[i];
-    if (cur === prev + 1) {
-      prev = cur;
-    } else {
-      ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
-      start = cur;
-      prev = cur;
-    }
-  }
-  ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
-  return ranges.join(", ");
-}
 
 /* ── Thumbnail Card Component ───────────────────────────────── */
 interface ExtractPageThumbProps {
