@@ -105,8 +105,10 @@ const mod: ToolModule<ExtractOpts> = {
 
     const baseName = file.name.replace(/\.pdf$/i, "");
     const useStreams = opts.allowCompression !== false;
+    const shouldMerge =
+      opts.mergeAll !== undefined ? Boolean(opts.mergeAll) : opts.mode !== "all";
 
-    if (opts.mergeAll !== false) {
+    if (shouldMerge) {
       const data = await buildMergedPdf(src, pageIndices, useStreams, ctx);
       return [
         {

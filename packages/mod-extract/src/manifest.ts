@@ -31,6 +31,7 @@ export const manifest: ToolManifest = {
       label: "Merge extracted pages into one PDF",
       type: "checkbox",
       default: true,
+      help: "Merge extracted pages into one PDF (defaults to true for 'select' mode, and false for 'all' mode).",
     },
     {
       key: "outputName",

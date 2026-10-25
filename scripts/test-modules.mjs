@@ -855,6 +855,60 @@ test("mod-extract", async (t) => {
     assert.equal(results[5].name, "my-doc-page6.pdf");
   });
 
+  await t.test("extracts all pages as separate PDFs by default when mode is all and mergeAll is omitted", async () => {
+    const results = await extractMod.run(
+      [{ name: "my-doc.pdf", data: samplePdf }],
+      { mode: "all" },
+      ctx
+    );
+
+    assert.equal(results.length, 6);
+    assert.equal(results[0].name, "my-doc-page1.pdf");
+    assert.equal(results[5].name, "my-doc-page6.pdf");
+  });
+
+  await t.test("merges all pages into one PDF when mode is all and mergeAll is true", async () => {
+    const results = await extractMod.run(
+      [{ name: "my-doc.pdf", data: samplePdf }],
+      { mode: "all", mergeAll: true },
+      ctx
+    );
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "my-doc-extracted.pdf");
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 6);
+  });
+
+  await t.test("defaults mergeAll to true for select mode when mergeAll is omitted", async () => {
+    const results = await extractMod.run(
+      [{ name: "my-doc.pdf", data: samplePdf }],
+      { mode: "select", pages: "1-3" },
+      ctx
+    );
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "my-doc-extracted.pdf");
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 3);
+  });
+
+  await t.test("manifest and default consistency: mode all label matches default output", async () => {
+    const modeField = extractMod.manifest.fields.find((f) => f.key === "mode");
+    assert.ok(modeField && modeField.type === "select");
+    const allOption = modeField.options.find((o) => o.value === "all");
+    assert.ok(allOption);
+    assert.match(allOption.label, /separate PDFs/i);
+
+    // Calling run with mode: "all" (without mergeAll) must produce separate PDFs matching the label
+    const results = await extractMod.run(
+      [{ name: "test-doc.pdf", data: samplePdf }],
+      { mode: "all" },
+      ctx
+    );
+    assert.equal(results.length, 6);
+  });
+
   await t.test("supports custom outputName for merged extraction", async () => {
     const results = await extractMod.run(
       [{ name: "doc.pdf", data: samplePdf }],

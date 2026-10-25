@@ -226,6 +226,7 @@ export default function ExtractTool() {
 
   const handleSelectAllPagesMode = useCallback(() => {
     setExtractMode("all");
+    setMergeAll(false);
     if (!totalPages) return;
     const all = new Set<number>();
     for (let i = 1; i <= totalPages; i++) {
@@ -237,6 +238,7 @@ export default function ExtractTool() {
 
   const handleCustomSelectMode = useCallback(() => {
     setExtractMode("select");
+    setMergeAll(true);
   }, []);
 
   const handlePagesInputChange = useCallback(
