@@ -877,7 +877,19 @@ export default function SplitTool() {
         {/* LEFT: Page Preview Panel */}
         <div className="split-preview-panel">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.875rem", flexWrap: "wrap", gap: "0.5rem" }}>
-            <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+            <span
+              style={{
+                fontSize: "0.8125rem",
+                fontWeight: 700,
+                color: "var(--text-secondary)",
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                maxWidth: "calc(100% - 100px)",
+              }}
+              title={file.name}
+            >
               {file.name}
             </span>
             <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", background: "var(--bg-subtle)", padding: "0.2rem 0.6rem", borderRadius: 99 }}>

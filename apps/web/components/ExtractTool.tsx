@@ -510,10 +510,23 @@ export default function ExtractTool() {
               marginBottom: "1rem",
               paddingBottom: "0.75rem",
               borderBottom: "1px solid var(--border-light)",
+              minWidth: 0,
             }}
           >
-            <div>
-              <strong style={{ fontSize: "0.95rem", color: "var(--text-main)" }}>{file.name}</strong>
+            <div style={{ minWidth: 0, overflow: "hidden", marginRight: "1rem" }}>
+              <strong
+                style={{
+                  fontSize: "0.95rem",
+                  color: "var(--text-main)",
+                  display: "block",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                title={file.name}
+              >
+                {file.name}
+              </strong>
               <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "0.15rem" }}>
                 {totalPages} {totalPages === 1 ? "page" : "pages"} &bull; {formatBytes(fileSize)}
               </div>
@@ -522,7 +535,7 @@ export default function ExtractTool() {
               type="button"
               className="btn-preview"
               onClick={handleReset}
-              style={{ fontSize: "0.8125rem", padding: "0.4rem 0.8rem" }}
+              style={{ fontSize: "0.8125rem", padding: "0.4rem 0.8rem", flexShrink: 0 }}
             >
               Change file
             </button>
@@ -762,7 +775,7 @@ export default function ExtractTool() {
               </button>
             )}
 
-            <button type="button" className="btn-secondary" onClick={handleReset}>
+            <button type="button" className="btn-secondary" onClick={handleReset} style={{ width: "100%", boxSizing: "border-box" }}>
               Choose different file
             </button>
           </div>

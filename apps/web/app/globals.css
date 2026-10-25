@@ -1582,12 +1582,15 @@ a {
 /* Two-pane layout */
 .split-layout {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 1.5rem;
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 960px) {
   .split-layout {
     grid-template-columns: 1fr;
   }
@@ -1600,6 +1603,10 @@ a {
   border-radius: 8px;
   padding: 1.25rem;
   min-height: 360px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
   box-shadow: var(--shadow-sm);
 }
 
@@ -1615,6 +1622,10 @@ a {
   gap: 1rem;
   position: sticky;
   top: 90px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Mode tabs */
@@ -1892,10 +1903,12 @@ a {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .split-submode-btn {
-  padding: 0.65rem 0.75rem;
+  padding: 0.65rem 0.5rem;
   font-size: 0.8125rem;
   font-weight: 600;
   border-radius: var(--radius-md);
@@ -1905,6 +1918,12 @@ a {
   cursor: pointer;
   transition: all var(--transition-fast);
   text-align: center;
+  box-sizing: border-box;
+  white-space: normal;
+  line-height: 1.25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .split-submode-btn:hover:not(.active) {
@@ -1923,6 +1942,8 @@ a {
 
 .split-text-input {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 0.65rem 0.875rem;
   border: 1.5px solid var(--border-medium);
   border-radius: var(--radius-md);
@@ -1951,6 +1972,11 @@ a {
   color: #1e40af;
   font-size: 0.825rem;
   line-height: 1.45;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .split-info-box svg {
