@@ -1114,3 +1114,126 @@ test("UI regression: ExtractTool selection and mode switching", async (t) => {
     assert.deepEqual(Array.from(selectedPages).sort((a, b) => a - b), [1, 4, 5]);
   });
 });
+
+test("UI regression: RemoveTool range parsing and page-info failure handling", async (t) => {
+  let file = null;
+  let numPages = 0;
+  let deletedPages = new Set();
+  let rangeInput = "";
+  let rangeError = "";
+  let error = "";
+  let submitTriggered = false;
+
+  const canDelete = () => numPages > 0 && deletedPages.size > 0 && (numPages - deletedPages.size) > 0 && !rangeError;
+
+  function handleRangeInputChange(inputVal) {
+    rangeInput = inputVal;
+    error = "";
+
+    if (!inputVal.trim()) {
+      rangeError = "";
+      deletedPages = new Set();
+      return;
+    }
+
+    try {
+      const parsed = parsePageSpec(inputVal, numPages);
+      deletedPages = new Set(parsed);
+      rangeError = "";
+    } catch (err) {
+      deletedPages = new Set();
+      rangeError = err instanceof Error ? err.message : "Invalid page range.";
+    }
+  }
+
+  async function handleFileSelect(selectedFile, mockInfo) {
+    error = "";
+    deletedPages = new Set();
+    rangeInput = "";
+    rangeError = "";
+    file = selectedFile;
+
+    try {
+      const info = typeof mockInfo === "function" ? await mockInfo(selectedFile) : mockInfo;
+      if (!info || typeof info.numPages !== "number" || info.numPages <= 0) {
+        error = "Failed to load PDF info. Please select a valid PDF file.";
+        numPages = 0;
+        return;
+      }
+      numPages = info.numPages;
+    } catch {
+      error = "Failed to load PDF info. Please select a valid PDF file.";
+      numPages = 0;
+    }
+  }
+
+  function handleRemoveSubmit() {
+    if (!file || deletedPages.size === 0 || rangeError || numPages <= 0) return;
+    submitTriggered = true;
+  }
+
+  await t.test("typing invalid range after selection clears hidden selection, sets inline error, and disables remove", async () => {
+    // Setup file with 5 pages and select pages 1 and 2
+    await handleFileSelect({ name: "doc.pdf" }, { numPages: 5 });
+    handleRangeInputChange("1-2");
+
+    assert.equal(numPages, 5);
+    assert.equal(rangeError, "");
+    assert.deepEqual(Array.from(deletedPages), [0, 1]);
+    assert.equal(canDelete(), true);
+
+    // User types invalid text
+    handleRangeInputChange("abc");
+
+    assert.equal(rangeInput, "abc");
+    assert.equal(deletedPages.size, 0); // No hidden active selection!
+    assert.match(rangeError, /Invalid page range/); // Inline error explains problem!
+    assert.equal(canDelete(), false); // Remove is disabled!
+
+    // Verify submit is blocked
+    submitTriggered = false;
+    handleRemoveSubmit();
+    assert.equal(submitTriggered, false);
+
+    // User types out-of-bounds range
+    handleRangeInputChange("1-10");
+    assert.equal(deletedPages.size, 0);
+    assert.match(rangeError, /outside 1-5/);
+    assert.equal(canDelete(), false);
+
+    // User corrects input
+    handleRangeInputChange("3, 5");
+    assert.equal(rangeError, "");
+    assert.deepEqual(Array.from(deletedPages), [2, 4]);
+    assert.equal(canDelete(), true);
+
+    submitTriggered = false;
+    handleRemoveSubmit();
+    assert.equal(submitTriggered, true);
+  });
+
+  await t.test("page-info failure shows error, disables tool, and does not assume one page", async () => {
+    // 1. Info returns null
+    await handleFileSelect({ name: "corrupt.pdf" }, null);
+    assert.equal(numPages, 0); // Does NOT assume 1 page
+    assert.equal(error, "Failed to load PDF info. Please select a valid PDF file.");
+    assert.equal(canDelete(), false);
+
+    // 2. Info throws
+    await handleFileSelect({ name: "error.pdf" }, async () => { throw new Error("corrupt stream"); });
+    assert.equal(numPages, 0);
+    assert.equal(error, "Failed to load PDF info. Please select a valid PDF file.");
+    assert.equal(canDelete(), false);
+
+    // 3. Info returns 0 or negative pages
+    await handleFileSelect({ name: "zero.pdf" }, { numPages: 0 });
+    assert.equal(numPages, 0);
+    assert.equal(error, "Failed to load PDF info. Please select a valid PDF file.");
+    assert.equal(canDelete(), false);
+
+    // 4. Recovery on valid file
+    await handleFileSelect({ name: "valid.pdf" }, { numPages: 10 });
+    assert.equal(numPages, 10);
+    assert.equal(error, "");
+  });
+});

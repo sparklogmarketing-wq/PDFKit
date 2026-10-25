@@ -321,6 +321,7 @@ function RemoveRightPanel({
   numPages,
   deletedCount,
   rangeInput,
+  rangeError,
   onRangeInputChange,
   onClearSelection,
   outputFileName,
@@ -337,6 +338,7 @@ function RemoveRightPanel({
   readonly numPages: number;
   readonly deletedCount: number;
   readonly rangeInput: string;
+  readonly rangeError?: string;
   readonly onRangeInputChange: (val: string) => void;
   readonly onClearSelection: () => void;
   readonly outputFileName: string;
@@ -349,7 +351,7 @@ function RemoveRightPanel({
   readonly onOpenConfirmModal: () => void;
 }) {
   const remainingCount = numPages - deletedCount;
-  const canDelete = deletedCount > 0 && remainingCount > 0;
+  const canDelete = numPages > 0 && deletedCount > 0 && remainingCount > 0 && !rangeError;
 
   return (
     <div className="tool-sticky-panel">
@@ -412,7 +414,7 @@ function RemoveRightPanel({
           style={{
             width: "100%",
             padding: "0.65rem 0.875rem",
-            border: "1.5px solid var(--border-medium)",
+            border: rangeError ? "1.5px solid #dc2626" : "1.5px solid var(--border-medium)",
             borderRadius: "var(--radius-md)",
             fontSize: "0.9375rem",
             fontWeight: 600,
@@ -420,9 +422,15 @@ function RemoveRightPanel({
             boxSizing: "border-box",
           }}
         />
-        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: "0.35rem 0 0 0" }}>
-          Enter individual pages or ranges separated by commas (e.g. 1, 3-5).
-        </p>
+        {rangeError ? (
+          <p role="alert" style={{ fontSize: "0.75rem", color: "#dc2626", margin: "0.35rem 0 0 0" }}>
+            {rangeError}
+          </p>
+        ) : (
+          <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: "0.35rem 0 0 0" }}>
+            Enter individual pages or ranges separated by commas (e.g. 1, 3-5).
+          </p>
+        )}
 
         {/* Quick action button */}
         {deletedCount > 0 && (
@@ -523,6 +531,7 @@ export default function RemoveTool() {
   const [numPages, setNumPages] = useState<number>(0);
   const [deletedPages, setDeletedPages] = useState<Set<number>>(new Set());
   const [rangeInput, setRangeInput] = useState<string>("");
+  const [rangeError, setRangeError] = useState<string>("");
   const [outputFileName, setOutputFileName] = useState<string>("document-removed.pdf");
 
   /* Zoom modal state */
@@ -577,15 +586,26 @@ export default function RemoveTool() {
     setProgress(null);
     setDeletedPages(new Set());
     setRangeInput("");
+    setRangeError("");
 
     const base = selectedFile.name.replace(/\.pdf$/i, "");
     setOutputFileName(`${base}-removed.pdf`);
     setFile(selectedFile);
 
-    const info = await getPdfInfo(selectedFile);
-    if (loadId !== loadIdRef.current) return;
-    const pagesCount = info?.numPages || 1;
-    setNumPages(pagesCount);
+    try {
+      const info = await getPdfInfo(selectedFile);
+      if (loadId !== loadIdRef.current) return;
+      if (!info || typeof info.numPages !== "number" || info.numPages <= 0) {
+        setError("Failed to load PDF info. Please select a valid PDF file.");
+        setNumPages(0);
+        return;
+      }
+      setNumPages(info.numPages);
+    } catch {
+      if (loadId !== loadIdRef.current) return;
+      setError("Failed to load PDF info. Please select a valid PDF file.");
+      setNumPages(0);
+    }
   }, []);
 
   function clearAllFiles() {
@@ -599,6 +619,7 @@ export default function RemoveTool() {
     setNumPages(0);
     setDeletedPages(new Set());
     setRangeInput("");
+    setRangeError("");
     setResults([]);
     setError("");
     setConfirmModalOpen(false);
@@ -621,6 +642,7 @@ export default function RemoveTool() {
         return next;
       });
       setError("");
+      setRangeError("");
     },
     []
   );
@@ -632,6 +654,7 @@ export default function RemoveTool() {
       setError("");
 
       if (!inputVal.trim()) {
+        setRangeError("");
         setDeletedPages(new Set());
         return;
       }
@@ -639,8 +662,11 @@ export default function RemoveTool() {
       try {
         const parsed = parsePageSpec(inputVal, numPages);
         setDeletedPages(new Set(parsed));
-      } catch {
-        // While user is typing intermediate states (e.g. "1-"), do not crash
+        setRangeError("");
+      } catch (err: unknown) {
+        setDeletedPages(new Set());
+        const msg = err instanceof Error ? err.message : "Invalid page range.";
+        setRangeError(msg);
       }
     },
     [numPages]
@@ -650,12 +676,13 @@ export default function RemoveTool() {
   const handleClearSelection = useCallback(() => {
     setDeletedPages(new Set());
     setRangeInput("");
+    setRangeError("");
     setError("");
   }, []);
 
   /* ── Run Tool Execution ──────────────────────────────────── */
   async function handleRemoveSubmit() {
-    if (!file || deletedPages.size === 0) return;
+    if (!file || deletedPages.size === 0 || rangeError || numPages <= 0) return;
     const runId = ++runIdRef.current;
     setConfirmModalOpen(false);
 
@@ -774,6 +801,7 @@ export default function RemoveTool() {
             numPages={numPages}
             deletedCount={deletedPages.size}
             rangeInput={rangeInput}
+            rangeError={rangeError}
             onRangeInputChange={handleRangeInputChange}
             onClearSelection={handleClearSelection}
             outputFileName={outputFileName}
