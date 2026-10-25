@@ -12,38 +12,11 @@ import ToolResultsView from "./ToolResultsView";
 import ToolProgressBar from "./ToolProgressBar";
 import ToolWorkspaceShell from "./ToolWorkspaceShell";
 import ToolPanelHeader from "./ToolPanelHeader";
-import type { OutputFile } from "@pdfkit/core";
+import { parsePageRanges, type OutputFile } from "@pdfkit/core";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 
-function parseRangePart(trimmed: string, maxPages: number, result: Set<number>) {
-  if (trimmed.includes("-")) {
-    const [startStr, endStr] = trimmed.split("-");
-    const start = Math.max(1, Math.min(maxPages, Number(startStr.trim()) || 1));
-    const end = endStr?.trim()
-      ? Math.max(1, Math.min(maxPages, Number(endStr.trim()) || maxPages))
-      : maxPages;
-    const [from, to] = start <= end ? [start, end] : [end, start];
-    for (let p = from; p <= to; p++) {
-      result.add(p);
-    }
-  } else {
-    const p = Number(trimmed);
-    if (!Number.isNaN(p) && p >= 1 && p <= maxPages) {
-      result.add(p);
-    }
-  }
-}
 
-function parsePagesInput(text: string, maxPages: number): Set<number> {
-  const result = new Set<number>();
-  if (!text?.trim()) return result;
-  for (const part of text.split(",")) {
-    const trimmed = part.trim();
-    if (trimmed) parseRangePart(trimmed, maxPages, result);
-  }
-  return result;
-}
 
 /* ── Single Page Thumbnail Card ──────────────────────────────── */
 function RotatePageCard({
@@ -884,7 +857,17 @@ export default function RotateTool() {
 
   /* Parsed Specific Excluded Pages from Tab 3 (based on continuous page numbering) */
   const excludedSpecificPagesSet = useMemo(() => {
-    return parsePagesInput(notRotatePagesInput, totalPagesAllFiles || 1);
+    if (!notRotatePagesInput?.trim()) return new Set<number>();
+    try {
+      const pages = parsePageRanges(notRotatePagesInput, totalPagesAllFiles || 1, {
+        mode: "lenient",
+        clamp: true,
+        allowReversed: true,
+      });
+      return new Set(pages);
+    } catch {
+      return new Set<number>();
+    }
   }, [notRotatePagesInput, totalPagesAllFiles]);
 
   /* Check if a given page number is protected from rotation (by globalPageNum) */

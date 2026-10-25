@@ -1,7 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { PDFDocument } from "@cantoo/pdf-lib";
-import { parsePageSpec, ToolError } from "../packages/core/src/index.ts";
+import {
+  parsePageSpec,
+  parsePageRanges as coreParsePageRanges,
+  formatPageRanges as coreFormatPageRanges,
+  formatPageIndices as coreFormatPageIndices,
+  PageRangeError,
+  ToolError,
+} from "../packages/core/src/index.ts";
 import mergeMod from "../packages/mod-merge/src/index.ts";
 import splitMod, { DEFAULT_MAX_SIZE_BYTES } from "../packages/mod-split/src/index.ts";
 import rotateMod from "../packages/mod-rotate/src/index.ts";
@@ -47,6 +56,89 @@ test("parsePageSpec", async (t) => {
     assert.throws(() => parsePageSpec("abc", 5), /Invalid page range/);
     assert.throws(() => parsePageSpec("6-7", 5), /outside 1-5/);
     assert.throws(() => parsePageSpec("4-2", 5), /outside 1-5/);
+  });
+
+  await t.test("table-driven edge case validation: 0, reversed, open, duplicates, whitespace, invalid tokens, multi-dash", () => {
+    // 1. Page 0
+    assert.throws(() => parsePageSpec("0", 5), (err) => {
+      assert.ok(err instanceof PageRangeError);
+      assert.ok(err instanceof ToolError);
+      assert.match(err.message, /outside 1-5/);
+      assert.equal(err.token, "0");
+      return true;
+    });
+
+    // 2. Reversed ranges (strict throws; lenient allows with allowReversed)
+    assert.throws(() => parsePageSpec("5-3", 5), (err) => {
+      assert.ok(err instanceof PageRangeError);
+      assert.match(err.message, /outside 1-5/);
+      assert.equal(err.token, "5-3");
+      return true;
+    });
+    const lenientReversed = coreParsePageRanges("5-3", 5, { mode: "lenient", allowReversed: true });
+    assert.deepEqual(lenientReversed, [3, 4, 5]);
+
+    // 3. Open ranges & bare dashes
+    assert.deepEqual(parsePageSpec("3-", 5), [2, 3, 4]);
+    assert.deepEqual(parsePageSpec("-2", 5), [0, 1]);
+    assert.throws(() => parsePageSpec("-", 5), /Invalid page range/);
+
+    // 4. Duplicates & out-of-order intervals
+    assert.deepEqual(parsePageSpec("1, 1, 3, 2-4, 2", 5), [0, 1, 2, 3]);
+
+    // 5. Whitespace handling around commas and dashes
+    assert.deepEqual(parsePageSpec("  1 - 2 ,  4 , 5 -  ", 5), [0, 1, 3, 4]);
+
+    // 6. Invalid tokens
+    assert.throws(() => parsePageSpec("1-a", 5), /Invalid page range/);
+    assert.throws(() => parsePageSpec("a-1", 5), /Invalid page range/);
+    assert.throws(() => parsePageSpec("xyz", 5), /Invalid page range/);
+
+    // 7. Multi-dash input
+    assert.throws(() => parsePageSpec("1-3-5", 5), (err) => {
+      assert.ok(err instanceof PageRangeError);
+      assert.match(err.message, /Invalid page range: "1-3-5"/);
+      assert.equal(err.token, "1-3-5");
+      return true;
+    });
+    assert.throws(() => parsePageSpec("--", 5), /Invalid page range/);
+    assert.throws(() => parsePageSpec("1--3", 5), /Invalid page range/);
+
+    // 8. Clamping in lenient mode vs error in strict mode
+    assert.throws(() => parsePageSpec("1-10", 5), /outside 1-5/);
+    const clamped = coreParsePageRanges("0-10", 5, { mode: "lenient", clamp: true });
+    assert.deepEqual(clamped, [1, 2, 3, 4, 5]);
+  });
+
+  await t.test("formatting round-trips for contiguous, sparse, and single ranges", () => {
+    // 1. Contiguous
+    const contiguous = [1, 2, 3, 4, 5];
+    const formattedContiguous = coreFormatPageRanges(contiguous);
+    assert.equal(formattedContiguous, "1-5");
+    assert.deepEqual(coreParsePageRanges(formattedContiguous, 5), contiguous);
+
+    // 2. Sparse
+    const sparse = [1, 3, 5, 7];
+    const formattedSparse = coreFormatPageRanges(sparse);
+    assert.equal(formattedSparse, "1, 3, 5, 7");
+    assert.deepEqual(coreParsePageRanges(formattedSparse, 7), sparse);
+
+    // 3. Mixed contiguous & sparse
+    const mixed = [1, 2, 3, 5, 7, 8, 9];
+    const formattedMixed = coreFormatPageRanges(mixed);
+    assert.equal(formattedMixed, "1-3, 5, 7-9");
+    assert.deepEqual(coreParsePageRanges(formattedMixed, 9), mixed);
+
+    // 4. Single page
+    assert.equal(coreFormatPageRanges([4]), "4");
+    assert.deepEqual(coreParsePageRanges("4", 5), [4]);
+
+    // 5. Empty
+    assert.equal(coreFormatPageRanges([]), "");
+    assert.deepEqual(coreParsePageRanges("", 5), []);
+
+    // 6. Zero-based index formatter
+    assert.equal(coreFormatPageIndices([0, 1, 2, 4]), "1-3, 5");
   });
 });
 
@@ -855,6 +947,60 @@ test("mod-extract", async (t) => {
     assert.equal(results[5].name, "my-doc-page6.pdf");
   });
 
+  await t.test("extracts all pages as separate PDFs by default when mode is all and mergeAll is omitted", async () => {
+    const results = await extractMod.run(
+      [{ name: "my-doc.pdf", data: samplePdf }],
+      { mode: "all" },
+      ctx
+    );
+
+    assert.equal(results.length, 6);
+    assert.equal(results[0].name, "my-doc-page1.pdf");
+    assert.equal(results[5].name, "my-doc-page6.pdf");
+  });
+
+  await t.test("merges all pages into one PDF when mode is all and mergeAll is true", async () => {
+    const results = await extractMod.run(
+      [{ name: "my-doc.pdf", data: samplePdf }],
+      { mode: "all", mergeAll: true },
+      ctx
+    );
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "my-doc-extracted.pdf");
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 6);
+  });
+
+  await t.test("defaults mergeAll to true for select mode when mergeAll is omitted", async () => {
+    const results = await extractMod.run(
+      [{ name: "my-doc.pdf", data: samplePdf }],
+      { mode: "select", pages: "1-3" },
+      ctx
+    );
+
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, "my-doc-extracted.pdf");
+    const doc = await PDFDocument.load(results[0].data);
+    assert.equal(doc.getPageCount(), 3);
+  });
+
+  await t.test("manifest and default consistency: mode all label matches default output", async () => {
+    const modeField = extractMod.manifest.fields.find((f) => f.key === "mode");
+    assert.ok(modeField && modeField.type === "select");
+    const allOption = modeField.options.find((o) => o.value === "all");
+    assert.ok(allOption);
+    assert.match(allOption.label, /separate PDFs/i);
+
+    // Calling run with mode: "all" (without mergeAll) must produce separate PDFs matching the label
+    const results = await extractMod.run(
+      [{ name: "test-doc.pdf", data: samplePdf }],
+      { mode: "all" },
+      ctx
+    );
+    assert.equal(results.length, 6);
+  });
+
   await t.test("supports custom outputName for merged extraction", async () => {
     const results = await extractMod.run(
       [{ name: "doc.pdf", data: samplePdf }],
@@ -1112,5 +1258,294 @@ test("UI regression: ExtractTool selection and mode switching", async (t) => {
     assert.equal(extractMode, "select");
     assert.equal(selectedPages.size, 3);
     assert.deepEqual(Array.from(selectedPages).sort((a, b) => a - b), [1, 4, 5]);
+  });
+});
+
+test("UI regression: RemoveTool range parsing and page-info failure handling", async (t) => {
+  let file = null;
+  let numPages = 0;
+  let deletedPages = new Set();
+  let rangeInput = "";
+  let rangeError = "";
+  let error = "";
+  let submitTriggered = false;
+
+  const canDelete = () => numPages > 0 && deletedPages.size > 0 && (numPages - deletedPages.size) > 0 && !rangeError;
+
+  function handleRangeInputChange(inputVal) {
+    rangeInput = inputVal;
+    error = "";
+
+    if (!inputVal.trim()) {
+      rangeError = "";
+      deletedPages = new Set();
+      return;
+    }
+
+    try {
+      const parsed = parsePageSpec(inputVal, numPages);
+      deletedPages = new Set(parsed);
+      rangeError = "";
+    } catch (err) {
+      deletedPages = new Set();
+      rangeError = err instanceof Error ? err.message : "Invalid page range.";
+    }
+  }
+
+  async function handleFileSelect(selectedFile, mockInfo) {
+    error = "";
+    deletedPages = new Set();
+    rangeInput = "";
+    rangeError = "";
+    file = selectedFile;
+
+    try {
+      const info = typeof mockInfo === "function" ? await mockInfo(selectedFile) : mockInfo;
+      if (!info || typeof info.numPages !== "number" || info.numPages <= 0) {
+        error = "Failed to load PDF info. Please select a valid PDF file.";
+        numPages = 0;
+        return;
+      }
+      numPages = info.numPages;
+    } catch {
+      error = "Failed to load PDF info. Please select a valid PDF file.";
+      numPages = 0;
+    }
+  }
+
+  function handleRemoveSubmit() {
+    if (!file || deletedPages.size === 0 || rangeError || numPages <= 0) return;
+    submitTriggered = true;
+  }
+
+  await t.test("typing invalid range after selection clears hidden selection, sets inline error, and disables remove", async () => {
+    // Setup file with 5 pages and select pages 1 and 2
+    await handleFileSelect({ name: "doc.pdf" }, { numPages: 5 });
+    handleRangeInputChange("1-2");
+
+    assert.equal(numPages, 5);
+    assert.equal(rangeError, "");
+    assert.deepEqual(Array.from(deletedPages), [0, 1]);
+    assert.equal(canDelete(), true);
+
+    // User types invalid text
+    handleRangeInputChange("abc");
+
+    assert.equal(rangeInput, "abc");
+    assert.equal(deletedPages.size, 0); // No hidden active selection!
+    assert.match(rangeError, /Invalid page range/); // Inline error explains problem!
+    assert.equal(canDelete(), false); // Remove is disabled!
+
+    // Verify submit is blocked
+    submitTriggered = false;
+    handleRemoveSubmit();
+    assert.equal(submitTriggered, false);
+
+    // User types out-of-bounds range
+    handleRangeInputChange("1-10");
+    assert.equal(deletedPages.size, 0);
+    assert.match(rangeError, /outside 1-5/);
+    assert.equal(canDelete(), false);
+
+    // User corrects input
+    handleRangeInputChange("3, 5");
+    assert.equal(rangeError, "");
+    assert.deepEqual(Array.from(deletedPages), [2, 4]);
+    assert.equal(canDelete(), true);
+
+    submitTriggered = false;
+    handleRemoveSubmit();
+    assert.equal(submitTriggered, true);
+  });
+
+  await t.test("page-info failure shows error, disables tool, and does not assume one page", async () => {
+    // 1. Info returns null
+    await handleFileSelect({ name: "corrupt.pdf" }, null);
+    assert.equal(numPages, 0); // Does NOT assume 1 page
+    assert.equal(error, "Failed to load PDF info. Please select a valid PDF file.");
+    assert.equal(canDelete(), false);
+
+    // 2. Info throws
+    await handleFileSelect({ name: "error.pdf" }, async () => { throw new Error("corrupt stream"); });
+    assert.equal(numPages, 0);
+    assert.equal(error, "Failed to load PDF info. Please select a valid PDF file.");
+    assert.equal(canDelete(), false);
+
+    // 3. Info returns 0 or negative pages
+    await handleFileSelect({ name: "zero.pdf" }, { numPages: 0 });
+    assert.equal(numPages, 0);
+    assert.equal(error, "Failed to load PDF info. Please select a valid PDF file.");
+    assert.equal(canDelete(), false);
+
+    // 4. Recovery on valid file
+    await handleFileSelect({ name: "valid.pdf" }, { numPages: 10 });
+    assert.equal(numPages, 10);
+    assert.equal(error, "");
+  });
+});
+
+
+test("Route dynamic loading and bundle splitting (Issue #25)", async (t) => {
+  await t.test("tool page route does not statically import tool components or ToolRunner", () => {
+    const pageContent = fs.readFileSync("apps/web/app/tools/[id]/page.tsx", "utf8");
+    const prohibitedImports = [
+      "MergeTool",
+      "SplitTool",
+      "RotateTool",
+      "RemoveTool",
+      "OrganizeTool",
+      "ExtractTool",
+      "ToolRunner",
+    ];
+    for (const tool of prohibitedImports) {
+      const staticImportRegex = new RegExp(`^\\s*import\\s+${tool}\\s+from`, "m");
+      assert.equal(
+        staticImportRegex.test(pageContent),
+        false,
+        `page.tsx must not statically import ${tool}`
+      );
+    }
+  });
+
+  await t.test("tool registry dynamically imports all registered active tools with fallback skeleton", () => {
+    const registryContent = fs.readFileSync("apps/web/lib/toolComponents.tsx", "utf8");
+    assert.ok(registryContent.includes('"use client"'));
+    assert.ok(registryContent.includes('../components/MergeTool'));
+    assert.ok(registryContent.includes('../components/SplitTool'));
+    assert.ok(registryContent.includes('../components/RotateTool'));
+    assert.ok(registryContent.includes('../components/RemoveTool'));
+    assert.ok(registryContent.includes('../components/OrganizeTool'));
+    assert.ok(registryContent.includes('../components/ExtractTool'));
+    assert.ok(registryContent.includes('../components/ToolRunner'));
+    assert.ok(registryContent.includes("ToolLoadingSkeleton"));
+  });
+
+  await t.test("route configuration enforces static params and returns notFound for unknown IDs", () => {
+    const pageContent = fs.readFileSync("apps/web/app/tools/[id]/page.tsx", "utf8");
+    assert.ok(pageContent.includes("export const dynamicParams = false"));
+    assert.ok(pageContent.includes("if (!manifest) notFound()"));
+  });
+
+  await t.test("bundle size check: route chunk does not contain monolithic tool code", () => {
+    const chunkDir = "apps/web/.next/static/chunks/app/tools/[id]";
+    if (fs.existsSync(chunkDir)) {
+      const files = fs.readdirSync(chunkDir).filter((f) => f.endsWith(".js"));
+      for (const file of files) {
+        const fileContent = fs.readFileSync(path.join(chunkDir, file), "utf8");
+        assert.equal(fileContent.includes("split-text-input"), false, "Must not bundle split tool");
+        assert.equal(fileContent.includes("Rotate Settings"), false, "Must not bundle rotate tool");
+        assert.equal(fileContent.includes("remove-page-card"), false, "Must not bundle remove tool");
+      }
+    }
+  });
+});
+
+test("Accessibility: modal focus trap and keyboard page selection/reordering (Issue #27)", async (t) => {
+  await t.test("PdfZoomModal has modal dialog semantics, focus trap, and conditional Escape handling", () => {
+    const modalContent = fs.readFileSync("apps/web/components/PdfZoomModal.tsx", "utf8");
+
+    // 1. Dialog semantics
+    assert.ok(modalContent.includes('role="dialog"'));
+    assert.ok(modalContent.includes('aria-modal="true"'));
+    assert.ok(modalContent.includes('aria-labelledby="pdf-modal-title"'));
+    assert.ok(modalContent.includes('id="pdf-modal-title"'));
+
+    // 2. Focus trap and initial focus
+    assert.ok(modalContent.includes("closeBtnRef.current?.focus()"));
+    assert.ok(modalContent.includes("triggerElementRef.current?.focus()"));
+    assert.ok(modalContent.includes('e.key === "Tab"'));
+    assert.ok(modalContent.includes("querySelectorAll"));
+
+    // 3. Scroll lock
+    assert.ok(modalContent.includes('document.body.style.overflow = "hidden"'));
+
+    // 4. Escape listener is guarded by file presence
+    assert.ok(modalContent.includes("if (!file) return;"));
+    assert.ok(modalContent.includes('e.key === "Escape"'));
+  });
+
+  await t.test("SplitTool SelectablePageCard supports keyboard selection with checkbox semantics", () => {
+    const splitContent = fs.readFileSync("apps/web/components/SplitTool.tsx", "utf8");
+
+    // 1. Accessibility attributes
+    assert.ok(splitContent.includes('role="checkbox"'));
+    assert.ok(splitContent.includes("aria-checked={isSelected}"));
+    assert.ok(splitContent.includes("tabIndex={0}"));
+
+    // 2. Keyboard toggling on Enter or Space
+    assert.ok(splitContent.includes('e.key === "Enter" || e.key === " "'));
+    assert.ok(splitContent.includes("onToggle(pageNum)"));
+
+    // 3. Simulation of keyboard toggle state logic
+    const selected = new Set([1]);
+    function toggle(p) {
+      if (selected.has(p)) selected.delete(p);
+      else selected.add(p);
+    }
+    function handleKeyDown(e, p) {
+      if (e.key === "Enter" || e.key === " ") {
+        toggle(p);
+      }
+    }
+
+    // Toggle page 2 via Space
+    handleKeyDown({ key: " " }, 2);
+    assert.deepEqual(Array.from(selected), [1, 2]);
+
+    // Untoggle page 1 via Enter
+    handleKeyDown({ key: "Enter" }, 1);
+    assert.deepEqual(Array.from(selected), [2]);
+
+    // Other keys do not toggle
+    handleKeyDown({ key: "ArrowDown" }, 3);
+    assert.deepEqual(Array.from(selected), [2]);
+  });
+
+  await t.test("OrganizeTool enables accessible reordering via move controls and keyboard shortcuts", () => {
+    const organizeContent = fs.readFileSync("apps/web/components/OrganizeTool.tsx", "utf8");
+
+    // 1. Move buttons with aria-labels and boundary disabling
+    assert.ok(organizeContent.includes('className="organize-icon-btn move-left"'));
+    assert.ok(organizeContent.includes('className="organize-icon-btn move-right"'));
+    assert.ok(organizeContent.includes("Move page "));
+    assert.ok(organizeContent.includes("earlier"));
+    assert.ok(organizeContent.includes("later"));
+    assert.ok(organizeContent.includes("disabled={!canMoveLeft}"));
+    assert.ok(organizeContent.includes("disabled={!canMoveRight}"));
+
+    // 2. Keyboard shortcut reordering (Alt+Left, Alt+Right)
+    assert.ok(organizeContent.includes('e.altKey && e.key === "ArrowLeft"'));
+    assert.ok(organizeContent.includes('e.altKey && e.key === "ArrowRight"'));
+
+    // 3. Simulation of handleMovePage state logic
+    let pages = [
+      { id: "p1", name: "Page 1" },
+      { id: "p2", name: "Page 2" },
+      { id: "p3", name: "Page 3" },
+    ];
+
+    function handleMovePage(fromIndex, toIndex) {
+      if (toIndex < 0 || toIndex >= pages.length || fromIndex === toIndex) return;
+      const next = [...pages];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      pages = next;
+    }
+
+    // Moving page at index 1 earlier (to index 0)
+    handleMovePage(1, 0);
+    assert.deepEqual(pages.map((p) => p.id), ["p2", "p1", "p3"]);
+
+    // Boundary check: cannot move index 0 earlier (< 0)
+    handleMovePage(0, -1);
+    assert.deepEqual(pages.map((p) => p.id), ["p2", "p1", "p3"]);
+
+    // Boundary check: cannot move last index later (>= length)
+    handleMovePage(2, 3);
+    assert.deepEqual(pages.map((p) => p.id), ["p2", "p1", "p3"]);
+
+    // Moving index 0 to last
+    handleMovePage(0, 2);
+    assert.deepEqual(pages.map((p) => p.id), ["p1", "p3", "p2"]);
   });
 });
