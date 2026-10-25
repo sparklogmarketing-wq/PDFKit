@@ -239,7 +239,11 @@ export default function ExtractTool() {
   const handleTogglePage = useCallback(
     (pageNum: number) => {
       setSelectedPages((prev) => {
-        const next = new Set(prev);
+        const base =
+          extractMode === "all" && prev.size !== totalPages
+            ? new Set(Array.from({ length: totalPages }, (_, i) => i + 1))
+            : prev;
+        const next = new Set(base);
         if (next.has(pageNum)) {
           next.delete(pageNum);
         } else {
@@ -248,8 +252,9 @@ export default function ExtractTool() {
         setPagesInput(formatPageRanges(Array.from(next)));
         return next;
       });
+      setExtractMode("select");
     },
-    []
+    [extractMode, totalPages]
   );
 
   const handleSelectAll = useCallback(() => {
@@ -259,7 +264,7 @@ export default function ExtractTool() {
       all.add(i);
     }
     setSelectedPages(all);
-    setPagesInput(`1-${totalPages}`);
+    setPagesInput(formatPageRanges(Array.from(all)));
   }, [totalPages]);
 
   const handleDeselectAll = useCallback(() => {
@@ -267,11 +272,27 @@ export default function ExtractTool() {
     setPagesInput("");
   }, []);
 
+  const handleSelectAllPagesMode = useCallback(() => {
+    setExtractMode("all");
+    if (!totalPages) return;
+    const all = new Set<number>();
+    for (let i = 1; i <= totalPages; i++) {
+      all.add(i);
+    }
+    setSelectedPages(all);
+    setPagesInput(formatPageRanges(Array.from(all)));
+  }, [totalPages]);
+
+  const handleCustomSelectMode = useCallback(() => {
+    setExtractMode("select");
+  }, []);
+
   const handlePagesInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       setPagesInput(val);
       setSelectedPages(parsePageRanges(val, totalPages));
+      setExtractMode("select");
     },
     [totalPages]
   );
@@ -500,7 +521,7 @@ export default function ExtractTool() {
   }
 
   /* ── 3. Main Workspace ────────────────────────────────────── */
-  const selectedCount = extractMode === "all" ? totalPages : selectedPages.size;
+  const selectedCount = selectedPages.size;
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   return (
@@ -587,7 +608,7 @@ export default function ExtractTool() {
                 key={pageNum}
                 file={file}
                 pageNum={pageNum}
-                isSelected={extractMode === "all" || selectedPages.has(pageNum)}
+                isSelected={selectedPages.has(pageNum)}
                 onToggle={handleTogglePage}
                 onZoom={(f, num) => setZoomPage(num)}
               />
@@ -610,14 +631,14 @@ export default function ExtractTool() {
               <button
                 type="button"
                 className={`split-submode-btn ${extractMode === "select" ? "active" : ""}`}
-                onClick={() => setExtractMode("select")}
+                onClick={handleCustomSelectMode}
               >
                 Select pages
               </button>
               <button
                 type="button"
                 className={`split-submode-btn ${extractMode === "all" ? "active" : ""}`}
-                onClick={() => setExtractMode("all")}
+                onClick={handleSelectAllPagesMode}
               >
                 Extract all pages
               </button>

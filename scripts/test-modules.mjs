@@ -1007,3 +1007,156 @@ test("UI regression: OrganizeTool blank page validation and deletion down to zer
   });
 });
 
+// ─────────────────────────────────────────────────────────────
+// UI regression: ExtractTool selection and mode switching (Issue #20)
+// ─────────────────────────────────────────────────────────────
+test("UI regression: ExtractTool selection and mode switching", async (t) => {
+  const totalPages = 5;
+  let extractMode = "all";
+  let selectedPages = new Set([1, 2, 3, 4, 5]);
+  let pagesInput = "1-5";
+
+  function formatPageRanges(pages) {
+    if (pages.length === 0) return "";
+    const sorted = Array.from(new Set(pages)).sort((a, b) => a - b);
+    const ranges = [];
+    let start = sorted[0];
+    let prev = sorted[0];
+
+    for (let i = 1; i < sorted.length; i++) {
+      const cur = sorted[i];
+      if (cur === prev + 1) {
+        prev = cur;
+      } else {
+        ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+        start = cur;
+        prev = cur;
+      }
+    }
+    ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+    return ranges.join(", ");
+  }
+
+  function parsePageRanges(text, maxPages) {
+    const result = new Set();
+    if (!text || !text.trim()) return result;
+    const parts = text.split(",");
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      if (trimmed.includes("-")) {
+        const [startStr, endStr] = trimmed.split("-");
+        const start = Math.max(1, Math.min(maxPages, Number(startStr?.trim()) || 1));
+        const end = endStr && endStr.trim()
+          ? Math.max(1, Math.min(maxPages, Number(endStr.trim()) || maxPages))
+          : maxPages;
+        const [from, to] = start <= end ? [start, end] : [end, start];
+        for (let p = from; p <= to; p++) {
+          result.add(p);
+        }
+      } else {
+        const p = Number(trimmed);
+        if (p >= 1 && p <= maxPages) {
+          result.add(p);
+        }
+      }
+    }
+    return result;
+  }
+
+  function handleTogglePage(pageNum) {
+    const base =
+      extractMode === "all" && selectedPages.size !== totalPages
+        ? new Set(Array.from({ length: totalPages }, (_, i) => i + 1))
+        : selectedPages;
+    const next = new Set(base);
+    if (next.has(pageNum)) {
+      next.delete(pageNum);
+    } else {
+      next.add(pageNum);
+    }
+    selectedPages = next;
+    pagesInput = formatPageRanges(Array.from(next));
+    extractMode = "select";
+  }
+
+  function handleSelectAllPagesMode() {
+    extractMode = "all";
+    const all = new Set(Array.from({ length: totalPages }, (_, i) => i + 1));
+    selectedPages = all;
+    pagesInput = formatPageRanges(Array.from(all));
+  }
+
+  function handleCustomSelectMode() {
+    extractMode = "select";
+  }
+
+  function handlePagesInputChange(val) {
+    pagesInput = val;
+    selectedPages = parsePageRanges(val, totalPages);
+    extractMode = "select";
+  }
+
+  await t.test("clicking thumbnail in all mode switches to select mode and deselects clicked card", () => {
+    // Start in "all" mode with all pages selected
+    handleSelectAllPagesMode();
+    assert.equal(extractMode, "all");
+    assert.equal(selectedPages.size, 5);
+    assert.equal(pagesInput, "1-5");
+
+    // Click card 3
+    handleTogglePage(3);
+
+    // Mode must immediately switch to select, card 3 deselected, range input updated
+    assert.equal(extractMode, "select");
+    assert.equal(selectedPages.has(3), false);
+    assert.equal(selectedPages.size, 4);
+    assert.equal(pagesInput, "1-2, 4-5");
+
+    // Click card 1
+    handleTogglePage(1);
+    assert.equal(extractMode, "select");
+    assert.equal(selectedPages.has(1), false);
+    assert.equal(selectedPages.size, 3);
+    assert.equal(pagesInput, "2, 4-5");
+  });
+
+  await t.test("switching from select to all resets selection to all pages and syncs range input", () => {
+    // Currently only pages 2, 4, 5 selected in select mode
+    assert.equal(extractMode, "select");
+    assert.equal(selectedPages.size, 3);
+
+    // Switch to "all" mode
+    handleSelectAllPagesMode();
+    assert.equal(extractMode, "all");
+    assert.equal(selectedPages.size, 5);
+    assert.equal(pagesInput, "1-5");
+    assert.deepEqual(Array.from(selectedPages).sort((a, b) => a - b), [1, 2, 3, 4, 5]);
+  });
+
+  await t.test("switching from all mode to select mode preserves visible selection without hidden changes", () => {
+    handleSelectAllPagesMode();
+    assert.equal(extractMode, "all");
+    assert.equal(selectedPages.size, 5);
+
+    // User clicks "Select pages" tab
+    handleCustomSelectMode();
+    assert.equal(extractMode, "select");
+    assert.equal(selectedPages.size, 5);
+    assert.equal(pagesInput, "1-5");
+    assert.deepEqual(Array.from(selectedPages).sort((a, b) => a - b), [1, 2, 3, 4, 5]);
+  });
+
+  await t.test("typing into pages input switches mode to select and synchronizes selectedPages", () => {
+    handleSelectAllPagesMode();
+    assert.equal(extractMode, "all");
+
+    // User types "1, 4-5"
+    handlePagesInputChange("1, 4-5");
+    assert.equal(extractMode, "select");
+    assert.equal(selectedPages.size, 3);
+    assert.deepEqual(Array.from(selectedPages).sort((a, b) => a - b), [1, 4, 5]);
+  });
+});
+
+
