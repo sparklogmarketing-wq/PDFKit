@@ -6,6 +6,7 @@ import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
+import { appendUniqueFiles } from "../lib/format";
 import PdfZoomModal from "./PdfZoomModal";
 import ToolResultsView from "./ToolResultsView";
 import ToolProgressBar from "./ToolProgressBar";
@@ -936,13 +937,10 @@ export default function RotateTool() {
     setResults([]);
     setProgress(null);
 
-    const updatedFiles = append
-      ? [...files, ...arr.filter((af) => !files.some((ef) => ef.name === af.name))]
-      : arr;
-
+    const updatedFiles = append ? appendUniqueFiles(files, arr) : appendUniqueFiles([], arr);
     setFiles(updatedFiles);
 
-    const newPagesMap = await loadPdfPagesMap(arr, filePagesMap);
+    const newPagesMap = await loadPdfPagesMap(updatedFiles, filePagesMap);
     if (loadId !== loadIdRef.current) return;
     setFilePagesMap(newPagesMap);
 

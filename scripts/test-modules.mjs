@@ -12,6 +12,7 @@ import "./test-cancellation.mjs";
 import "./test-pdf-cache-perf.mjs";
 import "./test-stale-async.mjs";
 import "./test-download-zip.mjs";
+import "./test-duplicate-files.mjs";
 import { formatPageRanges, parsePageRanges } from "../apps/web/lib/pageRanges.ts";
 
 async function createSamplePdf(pages = 3) {

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import type { FieldDef, OutputFile, ToolManifest } from "@pdfkit/core";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
+import { appendUniqueFiles } from "../lib/format";
 import PdfThumbnailCard from "./PdfThumbnailCard";
 import PdfZoomModal from "./PdfZoomModal";
 
@@ -65,12 +66,7 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
     setError("");
     clearZipError();
     if (manifest.multiple) {
-      // Append files, avoiding duplicate names
-      setFiles((prev) => {
-        const existingNames = new Set(prev.map((f) => f.name));
-        const newOnes = arr.filter((f) => !existingNames.has(f.name));
-        return [...prev, ...newOnes];
-      });
+      setFiles((prev) => appendUniqueFiles(prev, arr));
     } else {
       runIdRef.current++;
       cancelRef.current?.();
