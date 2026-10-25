@@ -1,16 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import ToolRunner from "../../../components/ToolRunner";
-import MergeTool from "../../../components/MergeTool";
-import SplitTool from "../../../components/SplitTool";
-import RotateTool from "../../../components/RotateTool";
-import RemoveTool from "../../../components/RemoveTool";
-import OrganizeTool from "../../../components/OrganizeTool";
-import ExtractTool from "../../../components/ExtractTool";
-import type { ToolManifest } from "@pdfkit/core";
 import { ToolIcon } from "../../../components/ToolIcon";
 import { manifests } from "../../../lib/registry";
 import { getRelatedTools } from "../../../lib/relatedTools";
+import { ToolView } from "../../../lib/toolComponents";
 
 export const dynamicParams = false;
 
@@ -26,24 +19,6 @@ export default async function ToolPage({ params }: { readonly params: Promise<{ 
   const categoryLabel = manifest.category;
   const isActive = manifest.status === "active";
   const relatedTools = getRelatedTools(manifest, manifests);
-
-  // Resolve tool component based on id to avoid nested ternary
-  let toolComponent: React.ReactNode;
-  if (id === "merge") {
-    toolComponent = <MergeTool />;
-  } else if (id === "split") {
-    toolComponent = <SplitTool />;
-  } else if (id === "rotate") {
-    toolComponent = <RotateTool />;
-  } else if (id === "remove") {
-    toolComponent = <RemoveTool />;
-  } else if (id === "organize") {
-    toolComponent = <OrganizeTool />;
-  } else if (id === "extract") {
-    toolComponent = <ExtractTool />;
-  } else {
-    toolComponent = <ToolRunner manifest={manifest} />;
-  }
 
   return (
     <div>
@@ -75,8 +50,8 @@ export default async function ToolPage({ params }: { readonly params: Promise<{ 
         </div>
       </div>
 
-      {/* Tool body */}
-      {toolComponent}
+      {/* Dynamic Tool Workspace */}
+      <ToolView id={id} manifest={manifest} />
 
       {/* Related tools */}
       {relatedTools.length > 0 && (

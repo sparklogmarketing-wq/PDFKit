@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { PDFDocument } from "@cantoo/pdf-lib";
 import {
   parsePageSpec,
@@ -1379,5 +1381,67 @@ test("UI regression: RemoveTool range parsing and page-info failure handling", a
     await handleFileSelect({ name: "valid.pdf" }, { numPages: 10 });
     assert.equal(numPages, 10);
     assert.equal(error, "");
+  });
+});
+
+
+test("Route dynamic loading and bundle splitting (Issue #25)", async (t) => {
+  await t.test("tool page route does not statically import tool components or ToolRunner", () => {
+    const pageContent = fs.readFileSync("apps/web/app/tools/[id]/page.tsx", "utf8");
+    const prohibitedImports = [
+      "MergeTool",
+      "SplitTool",
+      "RotateTool",
+      "RemoveTool",
+      "OrganizeTool",
+      "ExtractTool",
+      "ToolRunner",
+    ];
+    for (const tool of prohibitedImports) {
+      const staticImportRegex = new RegExp(`^\\s*import\\s+${tool}\\s+from`, "m");
+      assert.equal(
+        staticImportRegex.test(pageContent),
+        false,
+        `page.tsx must not statically import ${tool}`
+      );
+    }
+  });
+
+  await t.test("tool registry dynamically imports all registered active tools with fallback skeleton", () => {
+    const registryContent = fs.readFileSync("apps/web/lib/toolComponents.tsx", "utf8");
+    assert.match(registryContent, /"use client"/);
+    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/MergeTool["']\)/);
+    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/SplitTool["']\)/);
+    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/RotateTool["']\)/);
+    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/RemoveTool["']\)/);
+    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/OrganizeTool["']\)/);
+    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/ExtractTool["']\)/);
+    assert.match(registryContent, /dynamic\(\s*\(\)\s*=>\s*import\(["']\.\.\/components\/ToolRunner["']\)/);
+    assert.match(registryContent, /ToolLoadingSkeleton/);
+  });
+
+  await t.test("route configuration enforces static params and returns notFound for unknown IDs", () => {
+    const pageContent = fs.readFileSync("apps/web/app/tools/[id]/page.tsx", "utf8");
+    assert.match(pageContent, /export const dynamicParams = false/);
+    assert.match(pageContent, /if\s*\(!manifest\)\s*notFound\(\)/);
+  });
+
+  await t.test("bundle size check: route chunk does not contain monolithic tool code", () => {
+    const chunkDir = "apps/web/.next/static/chunks/app/tools/[id]";
+    if (fs.existsSync(chunkDir)) {
+      const files = fs.readdirSync(chunkDir).filter((f) => f.endsWith(".js"));
+      for (const file of files) {
+        const content = fs.readFileSync(path.join(chunkDir, file), "utf8");
+        // Tool route chunk should be minimal shell (< 25 KB), not 160+ KB monolith
+        assert.ok(
+          content.length < 25 * 1024,
+          `Route chunk ${file} size (${(content.length / 1024).toFixed(1)} KB) should be under 25 KB`
+        );
+        // None of the tool-specific components should be bundled directly into this chunk
+        assert.equal(content.includes("split-text-input"), false);
+        assert.equal(content.includes("Rotate Settings"), false);
+        assert.equal(content.includes("remove-page-card"), false);
+      }
+    }
   });
 });
