@@ -45,6 +45,7 @@ test("Tooling, TypeScript and CI Infrastructure (Issue #28)", async (t) => {
     const ciContent = fs.readFileSync(ciPath, "utf8");
     assert.ok(ciContent.includes("ubuntu-latest"), "CI must include ubuntu-latest");
     assert.ok(ciContent.includes("windows-latest"), "CI must include windows-latest");
+    assert.ok(ciContent.includes("npm ci --ignore-scripts"), "CI must run npm ci with --ignore-scripts");
     assert.ok(ciContent.includes("npm run typecheck"), "CI must run typecheck");
     assert.ok(ciContent.includes("npm run lint"), "CI must run lint");
     assert.ok(ciContent.includes("npm test"), "CI must run tests");
