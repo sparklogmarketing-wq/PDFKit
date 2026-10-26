@@ -9,12 +9,13 @@ npm install          # installs all workspaces from the repo root
 npm run dev          # http://localhost:3000
 npm run build        # static site in apps/web/out
 npm run start        # serve the built site
-npm run typecheck    # type-check all packages
-npm test             # run unit test suite
+npm run typecheck    # type-check all workspaces
+npm run lint         # lint all packages with ESLint
+npm test             # run unit and regression test suites
 npm run new:module -- <id> "<Title>" <category>   # scaffold a new module
 ```
 
-Requires Node 20+.
+Requires Node 22.6+ (required for native TypeScript strip-types execution).
 
 ---
 
