@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import type { FieldDef, OutputFile, ToolManifest } from "@pdfkit/core";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
-import { appendUniqueFiles } from "../lib/format";
+import { appendUniqueFiles, uint8ArrayToBlob } from "../lib/format";
+import { validateFilesForUpload, getPayloadMemoryWarning } from "../lib/limits";
 import { formatBytes } from "../lib/formatBytes";
 import PdfThumbnailCard from "./PdfThumbnailCard";
 import PdfZoomModal from "./PdfZoomModal";
@@ -31,6 +32,7 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [rotatingIdx, setRotatingIdx] = useState<number | null>(null);
+  const memoryWarning = useMemo(() => getPayloadMemoryWarning(files), [files]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cancelRef = useRef<(() => void) | null>(null);
@@ -58,6 +60,12 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
 
     if (arr.length === 0) {
       setError("Please select valid PDF files.");
+      return;
+    }
+
+    const validation = validateFilesForUpload(manifest.multiple ? arr : [arr[0]], manifest.multiple ? files : []);
+    if (validation.error) {
+      setError(validation.error);
       return;
     }
 
@@ -207,18 +215,21 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
     setStatusMessage("Reading files...");
 
     try {
-      const inputs = await Promise.all(
-        files.map(async (f) => ({
+      const inputs = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        setStatusMessage(`Reading file ${i + 1} of ${files.length}...`);
+        inputs.push({
           name: f.name,
           data: new Uint8Array(await f.arrayBuffer()),
-        }))
-      );
-      if (runId !== runIdRef.current) return;
+        });
+        if (runId !== runIdRef.current) return;
+      }
 
       setStatusMessage("Processing...");
       const job = runTool(manifest.id, inputs, opts, (p) => {
         if (runId === runIdRef.current) {
-          setProgress(Math.max(0.1, p));
+          setProgress((prev) => (prev === null ? Math.max(0.1, p) : Math.max(prev, p)));
           setStatusMessage(`Processing (${Math.round(p * 100)}%)...`);
         }
       });
@@ -234,7 +245,7 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
         outs.map((o) => ({
           name: o.name,
           size: o.data.byteLength,
-          url: URL.createObjectURL(new Blob([o.data as BlobPart], { type: o.mime })),
+          url: URL.createObjectURL(uint8ArrayToBlob(o.data, o.mime)),
         }))
       );
     } catch (e: any) {
@@ -548,6 +559,12 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
           </div>
         )}
 
+        {memoryWarning && (
+          <output className="alert-warning" style={{ marginBottom: "1rem" }}>
+            {memoryWarning}
+          </output>
+        )}
+
         {/* Error Alert */}
         {error && (
           <div role="alert" className="alert-error">
@@ -638,7 +655,7 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
                   <button
                     type="button"
                     className="btn-preview"
-                    onClick={() => window.open(r.url, "_blank")}
+                    onClick={() => window.open(r.url, "_blank", "noopener,noreferrer")}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>

@@ -15,6 +15,27 @@ export interface RenderPdfPageOptions {
   signal?: AbortSignal;
 }
 
+export function resolveAssetUrl(path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (typeof window !== "undefined") {
+    const nextData = (window as any).__NEXT_DATA__;
+    const routerBasePath = (window as any).next?.router?.basePath;
+    const basePath =
+      (nextData && typeof nextData.basePath === "string" ? nextData.basePath : null) ??
+      (typeof routerBasePath === "string" ? routerBasePath : null) ??
+      (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_BASE_PATH || process.env.BASE_PATH : "") ??
+      "";
+    const cleanBase = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
+    return `${cleanBase}${normalizedPath}`;
+  }
+  const envBase =
+    (typeof process !== "undefined"
+      ? process.env.NEXT_PUBLIC_BASE_PATH || process.env.BASE_PATH
+      : "") || "";
+  const cleanEnvBase = envBase.endsWith("/") ? envBase.slice(0, -1) : envBase;
+  return `${cleanEnvBase}${normalizedPath}`;
+}
+
 export function clearPdfDocumentCache(): void {
   documentCache = new WeakMap<File, Promise<any>>();
   pageCountCache = new WeakMap<File, number>();
@@ -40,9 +61,10 @@ export function getPdfJs(): Promise<any> {
     pdfjsPromise = (async () => {
       try {
         let lib: any;
+        const vendorUrl = resolveAssetUrl("/vendor/pdf.min.mjs");
+        const workerUrl = resolveAssetUrl("/vendor/pdf.worker.min.mjs");
         try {
           // Dynamic import of self-hosted ES module in the browser
-          const vendorUrl = "/vendor/pdf.min.mjs";
           // @ts-ignore - runtime browser path served from public/vendor/
           lib = await import(/* webpackIgnore: true */ vendorUrl);
         } catch {
@@ -50,13 +72,13 @@ export function getPdfJs(): Promise<any> {
           lib = await new Promise((resolve, reject) => {
             const script = document.createElement("script");
             script.type = "module";
-            script.src = "/vendor/pdf.min.mjs";
+            script.src = vendorUrl;
             script.onload = () => {
               const loaded = (window as any).pdfjsLib;
               if (loaded) resolve(loaded);
               else reject(new Error("pdfjsLib not defined after loading script"));
             };
-            script.onerror = () => reject(new Error("Failed to load /vendor/pdf.min.mjs"));
+            script.onerror = () => reject(new Error(`Failed to load ${vendorUrl}`));
             document.head.appendChild(script);
           });
         }
@@ -65,7 +87,7 @@ export function getPdfJs(): Promise<any> {
         if (!resolvedLib) {
           throw new Error("PDF.js library could not be loaded");
         }
-        resolvedLib.GlobalWorkerOptions.workerSrc = "/vendor/pdf.worker.min.mjs";
+        resolvedLib.GlobalWorkerOptions.workerSrc = workerUrl;
         (window as any).pdfjsLib = resolvedLib;
         return resolvedLib;
       } catch (err) {

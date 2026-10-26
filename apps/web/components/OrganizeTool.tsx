@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { validateFilesForUpload, getPayloadMemoryWarning } from "../lib/limits";
 import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { formatBytes } from "../lib/formatBytes";
+import { generateUUID, uint8ArrayToBlob } from "../lib/format";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
 import { reinsertBlanksAtRelativePositions } from "@pdfkit/mod-organize";
@@ -408,6 +410,7 @@ export default function OrganizeTool() {
 
   const isRunning = progress !== null;
   const hasRealPages = pages.some((p) => !p.isBlank);
+  const memoryWarning = useMemo(() => getPayloadMemoryWarning(files.map((f) => f.file)), [files]);
 
   /* Cleanup URLs and cancel active job on unmount */
   useEffect(() => {
@@ -427,6 +430,13 @@ export default function OrganizeTool() {
         setError("Please select valid PDF files.");
         return;
       }
+
+      const existingFiles = files.map((entry) => entry.file);
+      const validation = validateFilesForUpload(arr, existingFiles);
+      if (validation.error) {
+        setError(validation.error);
+        return;
+      }
       setError("");
 
       const loadId = ++loadIdRef.current;
@@ -441,7 +451,7 @@ export default function OrganizeTool() {
         const theme = FILE_PALETTES[(files.length + i) % FILE_PALETTES.length];
         const info = fileInfos[i];
         const total = info?.numPages || 1;
-        const fileId = `f-${crypto.randomUUID()}`;
+        const fileId = `f-${generateUUID()}`;
 
         const entry: FileEntry = {
           id: fileId,
@@ -455,7 +465,7 @@ export default function OrganizeTool() {
         const currentFileIndex = files.length + i;
         for (let p = 0; p < total; p++) {
           newPagesList.push({
-            id: `p-${fileId}-${p}-${crypto.randomUUID()}`,
+            id: `p-${fileId}-${p}-${generateUUID()}`,
             fileId,
             fileIndex: currentFileIndex,
             pageIndex: p,
@@ -515,7 +525,7 @@ export default function OrganizeTool() {
 
   function handleInsertBlank(insertAt: number) {
     const blankItem: PageItem = {
-      id: `blank-${crypto.randomUUID()}`,
+      id: `blank-${generateUUID()}`,
       fileId: "blank",
       fileIndex: -1,
       pageIndex: -1,
@@ -748,13 +758,16 @@ export default function OrganizeTool() {
 
     try {
       // 1. Prepare raw input files
-      const inputFiles = await Promise.all(
-        files.map(async (f) => ({
+      const inputFiles = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        setStatusMsg(`Preparing file ${i + 1} of ${files.length}…`);
+        inputFiles.push({
           name: f.file.name,
           data: new Uint8Array(await f.file.arrayBuffer()),
-        }))
-      );
-      if (runId !== runIdRef.current) return;
+        });
+        if (runId !== runIdRef.current) return;
+      }
 
       // 2. Prepare pages spec
       const pagesSpec = pages.map((p) => ({
@@ -775,7 +788,7 @@ export default function OrganizeTool() {
         { pages: pagesSpec, outputName },
         (p) => {
           if (runId === runIdRef.current) {
-            setProgress(Math.max(0.1, p));
+            setProgress((prev) => (prev === null ? Math.max(0.1, p) : Math.max(prev, p)));
             setStatusMsg(`Organizing PDF (${Math.round(p * 100)}%)…`);
           }
         }
@@ -787,7 +800,7 @@ export default function OrganizeTool() {
 
       const mapped = outputs.map((o) => ({
         name: o.name,
-        url: URL.createObjectURL(new Blob([o.data.buffer as ArrayBuffer], { type: o.mime })),
+        url: URL.createObjectURL(uint8ArrayToBlob(o.data, o.mime)),
         size: o.data.byteLength,
       }));
 
@@ -920,6 +933,15 @@ export default function OrganizeTool() {
             Organize complete — 1 file ready
           </strong>
         </div>
+
+        {memoryWarning && (
+          <output
+            className="alert-warning"
+            style={{ marginBottom: "1rem" }}
+          >
+            {memoryWarning}
+          </output>
+        )}
 
         {error && (
           <div

@@ -2,16 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState, useEffect, Suspense } from "react";
+import { useCallback, useState, useEffect, Suspense, useMemo } from "react";
+import {
+  deriveNavLinks,
+  buildSearchTarget,
+  SEARCH_DEBOUNCE_MS,
+  type NavLinkItem,
+} from "../lib/nav";
 
-const TOOL_LINKS = [
-  { href: "/", label: "All Tools" },
-  { href: "/tools/merge", label: "Merge PDF" },
-  { href: "/tools/split", label: "Split PDF" },
-  { href: "/tools/rotate", label: "Rotate PDF" },
-  { href: "/tools/organize", label: "Organize PDF" },
-  { href: "/tools/extract", label: "Extract Pages" },
-];
+export const TOOL_LINKS: NavLinkItem[] = deriveNavLinks();
 
 function NavSearch() {
   const router = useRouter();
@@ -19,34 +18,58 @@ function NavSearch() {
   const pathname = usePathname();
   const [value, setValue] = useState(searchParams.get("q") ?? "");
 
-  /* Keep input in sync if URL changes externally */
-  useEffect(() => {
-    setValue(searchParams.get("q") ?? "");
-  }, [searchParams]);
+  const urlQuery = searchParams.get("q") ?? "";
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const next = e.target.value;
-      setValue(next);
-      /* Only push search param when on the home page */
-      if (pathname === "/") {
-        const params = new URLSearchParams(searchParams.toString());
-        if (next) {
-          params.set("q", next);
-        } else {
-          params.delete("q");
-        }
-        router.replace(`/?${params.toString()}`, { scroll: false });
-      } else {
-        /* Navigate to home with query so HomeTools can filter */
-        router.push(next ? `/?q=${encodeURIComponent(next)}` : "/");
+  /* Keep input in sync if URL changes externally (e.g. Back/Forward) */
+  useEffect(() => {
+    setValue(urlQuery);
+  }, [urlQuery]);
+
+  const performNavigation = useCallback(
+    (targetQuery: string) => {
+      const decision = buildSearchTarget(
+        targetQuery,
+        pathname,
+        new URLSearchParams(searchParams.toString())
+      );
+      if (decision.action === "replace") {
+        router.replace(decision.url, { scroll: false });
+      } else if (decision.action === "push") {
+        router.push(decision.url);
       }
     },
     [pathname, router, searchParams]
   );
 
+  /* Debounce navigation while typing */
+  useEffect(() => {
+    if (value.trim() === urlQuery.trim()) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      performNavigation(value);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, urlQuery, performNavigation]);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setValue(e.target.value);
+  }, []);
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      performNavigation(value);
+    },
+    [performNavigation, value]
+  );
+
   return (
-    <div className="nav-search-wrapper">
+    <form className="nav-search-wrapper" onSubmit={handleSubmit} role="search">
       <svg
         className="nav-search-icon"
         width="15"
@@ -63,19 +86,20 @@ function NavSearch() {
         <line x1="21" y1="21" x2="16.65" y2="16.65" />
       </svg>
       <input
-        type="text"
+        type="search"
         className="nav-search-input"
         placeholder="Search tools…"
         value={value}
         onChange={handleChange}
         aria-label="Search PDF tools"
       />
-    </div>
+    </form>
   );
 }
 
 export default function Navbar() {
   const pathname = usePathname();
+  const links = useMemo(() => deriveNavLinks(), []);
 
   return (
     <header className="site-header">
@@ -108,7 +132,7 @@ export default function Navbar() {
 
         {/* Centre nav links */}
         <nav className="header-nav" aria-label="Main navigation">
-          {TOOL_LINKS.map(({ href, label }) => {
+          {links.map(({ href, label }) => {
             const isActive =
               href === "/"
                 ? pathname === "/"

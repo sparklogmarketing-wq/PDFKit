@@ -7,6 +7,7 @@ export interface ToolWorkspaceShellProps {
   readonly filesCount: number;
   readonly totalPages: number;
   readonly error?: string;
+  readonly warning?: string;
   readonly fileInputRef: RefObject<HTMLInputElement | null>;
   readonly onFilesSelected: (files: FileList | null, append: boolean) => void;
   readonly allowMultiple?: boolean;
@@ -17,6 +18,7 @@ export default function ToolWorkspaceShell({
   filesCount,
   totalPages,
   error,
+  warning,
   fileInputRef,
   onFilesSelected,
   allowMultiple = true,
@@ -50,7 +52,7 @@ export default function ToolWorkspaceShell({
 
   if (filesCount === 0) {
     return (
-      <div className="tool-runner-panel" style={{ maxWidth: 860, margin: "0 auto" }}>
+      <div className="tool-runner-panel workspace-empty-panel">
         <input
           ref={fileInputRef}
           type="file"
@@ -73,8 +75,14 @@ export default function ToolWorkspaceShell({
           badgeText={allowMultiple ? "Multiple files (.pdf)" : "Single PDF file (.pdf)"}
         />
 
+        {warning && !error && (
+          <output className="alert-warning workspace-alert">
+            {warning}
+          </output>
+        )}
+
         {error && (
-          <div className="alert-error" style={{ marginTop: "1rem" }}>
+          <div className="alert-error workspace-alert" role="alert">
             {error}
           </div>
         )}
@@ -83,16 +91,7 @@ export default function ToolWorkspaceShell({
   }
 
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: "100%",
-        margin: "0 auto",
-        paddingBottom: "3rem",
-        overflowX: "clip",
-        boxSizing: "border-box",
-      }}
-    >
+    <div className="workspace-root">
       <input
         ref={fileInputRef}
         type="file"
@@ -115,6 +114,18 @@ export default function ToolWorkspaceShell({
           onClick={() => fileInputRef.current?.click()}
           badgeText={`${filesCount} ${filesCount === 1 ? "PDF" : "PDFs"} selected (${totalPages} pages total)`}
         />
+      )}
+
+      {warning && (
+        <output className="alert-warning workspace-alert-spaced">
+          {warning}
+        </output>
+      )}
+
+      {error && (
+        <div className="alert-error workspace-alert-spaced" role="alert">
+          {error}
+        </div>
       )}
 
       {children}

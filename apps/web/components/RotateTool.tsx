@@ -6,7 +6,8 @@ import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
-import { appendUniqueFiles } from "../lib/format";
+import { appendUniqueFiles, uint8ArrayToBlob } from "../lib/format";
+import { validateFilesForUpload, getPayloadMemoryWarning } from "../lib/limits";
 import PdfZoomModal from "./PdfZoomModal";
 import ToolResultsView from "./ToolResultsView";
 import ToolProgressBar from "./ToolProgressBar";
@@ -250,10 +251,10 @@ function RotateControlsTab({
 }) {
   return (
     <div>
-      <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.35rem" }}>
+      <h3 className="rotate-tab-title">
         Rotate Controls
       </h3>
-      <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
+      <p className="rotate-tab-desc">
         Choose rotation direction for all selected PDFs. Pages configured in tabs 2 & 3 will remain protected.
       </p>
 
@@ -365,10 +366,10 @@ function RotateRangeTab({
 }) {
   return (
     <div>
-      <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.35rem" }}>
+      <h3 className="rotate-tab-title">
         Range to NOT Rotate
       </h3>
-      <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
+      <p className="rotate-tab-desc">
         Select a range of page numbers (e.g. from 1 to {Math.min(totalPagesAllFiles || 1, 3)}) that should stay in their original state and NOT be rotated.
       </p>
 
@@ -406,7 +407,7 @@ function RotateRangeTab({
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
           <div>
-            <label htmlFor="range-from-input" style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#92400e", marginBottom: "0.25rem" }}>
+            <label htmlFor="range-from-input" className="rotate-range-label">
               From Page:
             </label>
             <input
@@ -430,7 +431,7 @@ function RotateRangeTab({
           </div>
 
           <div>
-            <label htmlFor="range-to-input" style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#92400e", marginBottom: "0.25rem" }}>
+            <label htmlFor="range-to-input" className="rotate-range-label">
               To Page:
             </label>
             <input
@@ -493,10 +494,10 @@ function RotatePagesTab({
 }) {
   return (
     <div>
-      <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.35rem" }}>
+      <h3 className="rotate-tab-title">
         Specific Pages to NOT Rotate
       </h3>
-      <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
+      <p className="rotate-tab-desc">
         Enter individual page numbers that should NOT be rotated and stay in their original state.
       </p>
 
@@ -850,6 +851,8 @@ export default function RotateTool() {
     return files.reduce((acc, f) => acc + (filePagesMap[f.name] || 0), 0);
   }, [files, filePagesMap]);
 
+  const memoryWarning = useMemo(() => getPayloadMemoryWarning(files), [files]);
+
   /* Maximum pages in any single loaded file */
   const maxSingleFilePages = useMemo(() => {
     return files.reduce((acc, f) => Math.max(acc, filePagesMap[f.name] || 0), 0) || 1;
@@ -904,6 +907,12 @@ export default function RotateTool() {
 
     if (arr.length === 0) {
       setError("Please select valid PDF files.");
+      return;
+    }
+
+    const validation = validateFilesForUpload(arr, append ? files : []);
+    if (validation.error) {
+      setError(validation.error);
       return;
     }
 
@@ -995,7 +1004,36 @@ export default function RotateTool() {
     });
   }
 
-  /* ── Process & Run Tool ──────────────────────────────────── */
+  function buildPerFileRotations(
+  files: readonly File[],
+  filePagesMap: Record<string, number>,
+  pageAngles: Record<string, number>,
+  isPageProtected: (page: number) => boolean
+): Record<number, { pageRotations: Record<number, number>; degrees: number }> {
+  let currentGlobalPage = 1;
+  const perFileRotations: Record<number, any> = {};
+
+  for (let fIdx = 0; fIdx < files.length; fIdx++) {
+    const f = files[fIdx];
+    const numPages = filePagesMap[f.name] || 1;
+    const pageRotMap: Record<number, number> = {};
+
+    for (let p = 1; p <= numPages; p++, currentGlobalPage++) {
+      const key = `${f.name}-${p}`;
+      const isProtected = isPageProtected(currentGlobalPage);
+      pageRotMap[p] = isProtected ? 0 : (pageAngles[key] ?? 0);
+    }
+
+    perFileRotations[fIdx] = {
+      pageRotations: pageRotMap,
+      degrees: 0,
+    };
+  }
+
+  return perFileRotations;
+}
+
+/* ── Process & Run Tool ──────────────────────────────────── */
   async function handleRotateSubmit() {
     if (files.length === 0 || isRunning) return;
     const runId = ++runIdRef.current;
@@ -1004,32 +1042,23 @@ export default function RotateTool() {
     setStatusMsg("Preparing files for rotation...");
 
     try {
-      const inputs = await Promise.all(
-        files.map(async (f) => ({
+      const inputs = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        setStatusMsg(`Preparing file ${i + 1} of ${files.length}...`);
+        inputs.push({
           name: f.name,
           data: new Uint8Array(await f.arrayBuffer()),
-        }))
-      );
-      if (runId !== runIdRef.current) return;
-
-      let currentGlobalPage = 1;
-      const perFileRotations: Record<number, any> = {};
-      for (let fIdx = 0; fIdx < files.length; fIdx++) {
-        const f = files[fIdx];
-        const numPages = filePagesMap[f.name] || 1;
-        const pageRotMap: Record<number, number> = {};
-
-        for (let p = 1; p <= numPages; p++, currentGlobalPage++) {
-          const key = `${f.name}-${p}`;
-          const isProtected = isPageProtected(currentGlobalPage);
-          pageRotMap[p] = isProtected ? 0 : (pageAngles[key] ?? 0);
-        }
-
-        perFileRotations[fIdx] = {
-          pageRotations: pageRotMap,
-          degrees: 0,
-        };
+        });
+        if (runId !== runIdRef.current) return;
       }
+
+      const perFileRotations = buildPerFileRotations(
+        files,
+        filePagesMap,
+        pageAngles,
+        isPageProtected
+      );
 
       const toolOpts = {
         degrees: 0,
@@ -1040,7 +1069,8 @@ export default function RotateTool() {
 
       const job = runTool("rotate", inputs, toolOpts, (p) => {
         if (runId === runIdRef.current) {
-          setProgress(Math.round(p * 100));
+          const nextP = Math.round(p * 100);
+          setProgress((prev) => (prev === null ? nextP : Math.max(prev, nextP)));
           setStatusMsg(`Processing pages... ${Math.round(p * 100)}%`);
         }
       });
@@ -1050,7 +1080,7 @@ export default function RotateTool() {
       if (runId !== runIdRef.current || files.length === 0) return;
 
       const res = outputs.map((out) => {
-        const blob = new Blob([out.data as BlobPart], { type: out.mime || "application/pdf" });
+        const blob = uint8ArrayToBlob(out.data, out.mime);
         return {
           name: out.name,
           url: URL.createObjectURL(blob),
@@ -1099,9 +1129,11 @@ export default function RotateTool() {
   }
 
   /* ── RENDER: Document Rotation Studio ──────────────────────── */
+
   return (
     <ToolWorkspaceShell
       error={error}
+      warning={memoryWarning || undefined}
       fileInputRef={fileInputRef}
       filesCount={files.length}
       totalPages={totalPagesAllFiles}

@@ -6,7 +6,9 @@ import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatPageRanges, parsePageRanges } from "../lib/pageRanges";
+import { validateFilesForUpload } from "../lib/limits";
 import { formatBytes } from "../lib/formatBytes";
+import { uint8ArrayToBlob } from "../lib/format";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
 
@@ -378,6 +380,12 @@ export default function SplitTool() {
       setError("Please select a PDF file.");
       return;
     }
+
+    const validation = validateFilesForUpload([f]);
+    if (validation.error) {
+      setError(validation.error);
+      return;
+    }
     cancelRef.current?.();
     setCancel(null);
     runIdRef.current++;
@@ -616,7 +624,7 @@ export default function SplitTool() {
       if (runId !== runIdRef.current) return;
       const job = runTool("split", [{ name: file.name, data }], effectiveOpts, (p) => {
         if (runId === runIdRef.current) {
-          setProgress(Math.max(0.1, p));
+          setProgress((prev) => (prev === null ? Math.max(0.1, p) : Math.max(prev, p)));
           setStatusMsg(`Processing (${Math.round(p * 100)}%)…`);
         }
       });
@@ -626,7 +634,7 @@ export default function SplitTool() {
 
       const mapped = outputs.map((o) => ({
         name: o.name,
-        url: URL.createObjectURL(new Blob([o.data.buffer as ArrayBuffer], { type: o.mime })),
+        url: URL.createObjectURL(uint8ArrayToBlob(o.data, o.mime)),
         size: o.data.byteLength,
       }));
       setResults(mapped);

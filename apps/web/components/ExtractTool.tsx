@@ -6,7 +6,9 @@ import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
+import { uint8ArrayToBlob } from "../lib/format";
 import { formatPageRanges, parsePageRanges } from "../lib/pageRanges";
+import { validateFilesForUpload } from "../lib/limits";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
 
@@ -161,6 +163,13 @@ export default function ExtractTool() {
 
     setError(null);
     setResults(null);
+
+    const validation = validateFilesForUpload([selectedFile]);
+    if (validation.error) {
+      setError(validation.error);
+      return;
+    }
+
     try {
       const info = await getPdfInfo(selectedFile);
       if (loadId !== loadIdRef.current) return;
@@ -284,7 +293,7 @@ export default function ExtractTool() {
           outputName: outputName.trim() || undefined,
         },
         (p) => {
-          if (runId === runIdRef.current) setProgress(p);
+          if (runId === runIdRef.current) setProgress((prev) => (prev === null ? p : Math.max(prev, p)));
         }
       );
 
@@ -294,7 +303,7 @@ export default function ExtractTool() {
 
       const outputFiles = outputs.map((out: OutputFile) => ({
         name: out.name,
-        url: URL.createObjectURL(new Blob([out.data.buffer as ArrayBuffer], { type: out.mime })),
+        url: URL.createObjectURL(uint8ArrayToBlob(out.data, out.mime)),
         size: out.data.byteLength,
       }));
 
@@ -594,15 +603,15 @@ export default function ExtractTool() {
 
         {/* RIGHT: Config sidebar */}
         <div className="split-config-panel">
-          <h2 style={{ fontSize: "1.0625rem", fontWeight: 700, margin: 0, color: "var(--text-main)" }}>
+          <h2 className="split-panel-title">
             Extract Pages
           </h2>
 
           {/* Mode switch */}
           <div className="split-submode-row">
-            <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+            <span className="split-field-label">
               Extract mode:
-            </label>
+            </span>
             <div className="split-submode-tabs">
               <button
                 type="button"
@@ -649,7 +658,7 @@ export default function ExtractTool() {
               checked={mergeAll}
               onChange={(e) => setMergeAll(e.target.checked)}
             />
-            <span style={{ fontWeight: 600, color: "var(--text-main)" }}>
+            <span className="split-checkbox-label">
               Merge extracted pages into one PDF
             </span>
           </label>
@@ -740,7 +749,7 @@ export default function ExtractTool() {
           )}
 
           {/* Action buttons */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem", marginTop: "0.25rem" }}>
+          <div className="split-actions-stack">
             {isRunning ? (
               <button
                 type="button"
@@ -775,7 +784,7 @@ export default function ExtractTool() {
               </button>
             )}
 
-            <button type="button" className="btn-secondary" onClick={handleReset} style={{ width: "100%", boxSizing: "border-box" }}>
+            <button type="button" className="btn-secondary split-full-btn" onClick={handleReset}>
               Choose different file
             </button>
           </div>

@@ -1,4 +1,4 @@
-import type { OutputFile } from "@pdfkit/core";
+import { validatePayloadLimits, type OutputFile } from "@pdfkit/core";
 
 export class CancelledError extends Error {
   constructor(message = "Cancelled") {
@@ -34,6 +34,17 @@ export function runTool(
   onProgress: (p: number) => void,
 ): RunToolJob {
   let settled = false;
+
+  // Validate payload limits before transferring buffers to worker
+  try {
+    validatePayloadLimits(inputs);
+  } catch (err) {
+    return {
+      promise: Promise.reject(err),
+      cancel: () => {},
+    };
+  }
+
   let worker: Worker | null = new Worker(new URL("./tool.worker.ts", import.meta.url));
   let rejectPromise: ((reason?: any) => void) | null = null;
 

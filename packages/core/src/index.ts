@@ -7,8 +7,6 @@ export type FieldDef =
   | { key: string; label: string; type: "checkbox"; default?: boolean; help?: string }
   | { key: string; label: string; type: "select"; default?: string; options: { value: string; label: string }[]; help?: string };
 
-export type ToolStatus = "active" | "planned" | "beta";
-
 /** Lightweight, import-safe metadata. Must NOT import heavy libraries. */
 export interface ToolManifest {
   id: string;
@@ -19,7 +17,6 @@ export interface ToolManifest {
   accepts: string[];     // MIME types
   multiple: boolean;     // accepts several input files
   fields: FieldDef[];
-  status?: ToolStatus;
   related?: string[];
 }
 
@@ -44,6 +41,136 @@ export class PageRangeError extends ToolError {
     this.name = "PageRangeError";
     this.token = token;
   }
+}
+
+export class PayloadLimitError extends ToolError {
+  readonly code: "FILE_TOO_LARGE" | "TOO_MANY_FILES" | "TOTAL_SIZE_TOO_LARGE";
+  readonly limit: number;
+  readonly actual: number;
+  readonly fileName?: string;
+
+  constructor(
+    message: string,
+    code: "FILE_TOO_LARGE" | "TOO_MANY_FILES" | "TOTAL_SIZE_TOO_LARGE",
+    limit: number,
+    actual: number,
+    fileName?: string
+  ) {
+    super(message);
+    this.name = "PayloadLimitError";
+    this.code = code;
+    this.limit = limit;
+    this.actual = actual;
+    this.fileName = fileName;
+  }
+}
+
+export interface PayloadLimits {
+  /** Maximum allowed size in bytes for a single file. Default: 100 MB (104,857,600 bytes). */
+  maxFileSizeBytes?: number;
+  /** Maximum aggregate size in bytes across all files. Default: 250 MB (262,144,000 bytes). */
+  maxTotalSizeBytes?: number;
+  /** Maximum number of files. Default: 50. */
+  maxFileCount?: number;
+  /** Warning threshold in bytes where processing may cause memory pressure. Default: 50 MB (52,428,800 bytes). */
+  warnSizeBytes?: number;
+}
+
+export const DEFAULT_PAYLOAD_LIMITS: Required<PayloadLimits> = {
+  maxFileSizeBytes: 100 * 1024 * 1024,
+  maxTotalSizeBytes: 250 * 1024 * 1024,
+  maxFileCount: 50,
+  warnSizeBytes: 50 * 1024 * 1024,
+};
+
+export interface FilePayloadInfo {
+  readonly name: string;
+  readonly size?: number;
+  readonly data?: { readonly byteLength: number } | Uint8Array;
+}
+
+function getFilePayloadSize(f: FilePayloadInfo): number {
+  if (typeof f.size === "number") {
+    return f.size;
+  }
+  return f.data?.byteLength ?? 0;
+}
+
+function formatByteSize(bytes: number): string {
+  if (bytes <= 0 || !Number.isFinite(bytes)) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+  return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+/**
+ * Validates file size, total payload size, and file count against configured limits.
+ * Throws PayloadLimitError with actionable error messages if limits are exceeded.
+ */
+export function validatePayloadLimits(
+  files: readonly FilePayloadInfo[],
+  customLimits?: PayloadLimits
+): void {
+  const limits = { ...DEFAULT_PAYLOAD_LIMITS, ...customLimits };
+
+  if (files.length > limits.maxFileCount) {
+    throw new PayloadLimitError(
+      `Too many files: maximum allowed is ${limits.maxFileCount} files (received ${files.length}).`,
+      "TOO_MANY_FILES",
+      limits.maxFileCount,
+      files.length
+    );
+  }
+
+  let totalSize = 0;
+  for (const f of files) {
+    const size = getFilePayloadSize(f);
+    if (size > limits.maxFileSizeBytes) {
+      throw new PayloadLimitError(
+        `File "${f.name}" (${formatByteSize(size)}) exceeds the maximum allowed size of ${formatByteSize(limits.maxFileSizeBytes)}.`,
+        "FILE_TOO_LARGE",
+        limits.maxFileSizeBytes,
+        size,
+        f.name
+      );
+    }
+    totalSize += size;
+  }
+
+  if (totalSize > limits.maxTotalSizeBytes) {
+    throw new PayloadLimitError(
+      `Total files size (${formatByteSize(totalSize)}) exceeds the maximum allowed total of ${formatByteSize(limits.maxTotalSizeBytes)}.`,
+      "TOTAL_SIZE_TOO_LARGE",
+      limits.maxTotalSizeBytes,
+      totalSize
+    );
+  }
+}
+
+/**
+ * Returns a user-facing memory warning string if the files approach memory pressure,
+ * or null if below the warning threshold.
+ */
+export function getPayloadMemoryWarning(
+  files: readonly FilePayloadInfo[],
+  customLimits?: PayloadLimits
+): string | null {
+  const limits = { ...DEFAULT_PAYLOAD_LIMITS, ...customLimits };
+  let totalSize = 0;
+  for (const f of files) {
+    const size = getFilePayloadSize(f);
+    totalSize += size;
+  }
+
+  const isLargeSize = totalSize >= limits.warnSizeBytes;
+  const isLargeCount = files.length >= 20;
+
+  if (isLargeSize || isLargeCount) {
+    const totalFormatted = formatByteSize(totalSize);
+    return `Large operation (${files.length} file${files.length === 1 ? "" : "s"}, ${totalFormatted}): Processing large documents may consume significant browser memory.`;
+  }
+  return null;
 }
 
 export interface PageRangeOptions {

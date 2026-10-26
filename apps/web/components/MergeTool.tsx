@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { loadPdfPagesMap } from "../lib/pdfjs";
 import { runTool, isCancelledError } from "../lib/runTool";
-import { calculateTotalPages, filterPdfFiles, appendUniqueFiles } from "../lib/format";
+import { calculateTotalPages, filterPdfFiles, appendUniqueFiles, uint8ArrayToBlob } from "../lib/format";
+import { validateFilesForUpload, getPayloadMemoryWarning } from "../lib/limits";
 import PdfZoomModal from "./PdfZoomModal";
 import PdfThumbnailCard from "./PdfThumbnailCard";
 import ToolResultsView from "./ToolResultsView";
@@ -65,35 +66,26 @@ function MergeRightPanel({
   return (
     <div className="tool-sticky-panel">
       {/* Panel Header */}
-      <div style={{ marginBottom: "1.25rem", paddingBottom: "0.875rem", borderBottom: "1.5px solid var(--border-light)" }}>
-        <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--text-main)", margin: "0 0 0.25rem 0" }}>
+      <div className="merge-settings-header">
+        <h3 className="merge-settings-title">
           Merge Settings
         </h3>
-        <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
+        <p className="merge-settings-desc">
           Files will be combined in the exact sequence shown below.
         </p>
       </div>
 
       {/* Sequence List Header & Quick Sort Tools */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
-        <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-main)" }}>
+      <div className="merge-seq-header">
+        <span className="merge-seq-label">
           Sequence ({files.length} {files.length === 1 ? "file" : "files"})
         </span>
-        <div style={{ display: "flex", gap: "0.35rem" }}>
+        <div className="merge-sort-actions">
           <button
             type="button"
             onClick={onSortAlpha}
             title="Sort alphabetically (A-Z)"
-            style={{
-              padding: "0.25rem 0.5rem",
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid var(--border-light)",
-              background: "var(--bg-surface)",
-              color: "var(--text-secondary)",
-              cursor: "pointer",
-            }}
+            className="merge-sort-btn"
           >
             A-Z
           </button>
@@ -101,16 +93,7 @@ function MergeRightPanel({
             type="button"
             onClick={onReverse}
             title="Reverse sequence order"
-            style={{
-              padding: "0.25rem 0.5rem",
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid var(--border-light)",
-              background: "var(--bg-surface)",
-              color: "var(--text-secondary)",
-              cursor: "pointer",
-            }}
+            className="merge-sort-btn"
           >
             Reverse
           </button>
@@ -118,99 +101,38 @@ function MergeRightPanel({
       </div>
 
       {/* Sequence List */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.45rem",
-          maxHeight: "220px",
-          overflowY: "auto",
-          paddingRight: "0.25rem",
-          marginBottom: "1.25rem",
-        }}
-      >
+      <div className="merge-seq-list">
         {files.map((file, idx) => {
           const numPages = filePagesMap[file.name] || 1;
           return (
             <div
               key={`${file.name}-${idx}`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "0.45rem 0.65rem",
-                background: "var(--bg-subtle)",
-                border: "1px solid var(--border-light)",
-                borderRadius: "var(--radius-sm)",
-                fontSize: "0.8125rem",
-              }}
+              className="merge-seq-item"
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0, flex: 1, marginRight: "0.5rem" }}>
-                <span
-                  style={{
-                    width: "20px",
-                    height: "20px",
-                    borderRadius: "50%",
-                    background: "var(--primary-subtle)",
-                    color: "var(--primary)",
-                    fontSize: "0.6875rem",
-                    fontWeight: 800,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
+              <div className="merge-seq-item-info">
+                <span className="merge-seq-badge">
                   {idx + 1}
                 </span>
                 <span
-                  style={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    fontWeight: 600,
-                    color: "var(--text-main)",
-                  }}
+                  className="merge-seq-name"
                   title={file.name}
                 >
                   {file.name}
                 </span>
-                <span
-                  style={{
-                    fontSize: "0.6875rem",
-                    color: "var(--text-muted)",
-                    background: "var(--bg-surface)",
-                    padding: "0.1rem 0.35rem",
-                    borderRadius: "4px",
-                    border: "1px solid var(--border-light)",
-                    flexShrink: 0,
-                  }}
-                >
+                <span className="merge-seq-pages">
                   {numPages}p
                 </span>
               </div>
 
               {/* Move Up, Down, Remove buttons */}
-              <div style={{ display: "flex", alignItems: "center", gap: "0.2rem", flexShrink: 0 }}>
+              <div className="merge-seq-actions">
                 <button
                   type="button"
                   disabled={idx === 0 || isRunning}
                   onClick={() => onMoveUp(idx)}
                   title="Move Up"
                   aria-label={`Move ${file.name} up`}
-                  style={{
-                    width: "22px",
-                    height: "22px",
-                    borderRadius: "4px",
-                    border: "1px solid var(--border-light)",
-                    background: "#ffffff",
-                    color: idx === 0 ? "var(--text-muted)" : "var(--text-main)",
-                    cursor: idx === 0 ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: 0,
-                  }}
+                  className="merge-seq-btn"
                 >
                   <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="18 15 12 9 6 15" />
@@ -223,19 +145,7 @@ function MergeRightPanel({
                   onClick={() => onMoveDown(idx)}
                   title="Move Down"
                   aria-label={`Move ${file.name} down`}
-                  style={{
-                    width: "22px",
-                    height: "22px",
-                    borderRadius: "4px",
-                    border: "1px solid var(--border-light)",
-                    background: "#ffffff",
-                    color: idx === files.length - 1 ? "var(--text-muted)" : "var(--text-main)",
-                    cursor: idx === files.length - 1 ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: 0,
-                  }}
+                  className="merge-seq-btn"
                 >
                   <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="6 9 12 15 18 9" />
@@ -248,20 +158,7 @@ function MergeRightPanel({
                   onClick={() => onRemove(idx)}
                   title="Remove file"
                   aria-label={`Remove ${file.name}`}
-                  style={{
-                    width: "22px",
-                    height: "22px",
-                    borderRadius: "4px",
-                    border: "none",
-                    background: "transparent",
-                    color: "var(--danger)",
-                    cursor: "pointer",
-                    fontSize: "1rem",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: 0,
-                  }}
+                  className="merge-seq-remove-btn"
                 >
                   &times;
                 </button>
@@ -272,8 +169,8 @@ function MergeRightPanel({
       </div>
 
       {/* Output File Name Setting */}
-      <div style={{ marginBottom: "1.25rem" }}>
-        <label htmlFor="merge-output-name-input" style={{ display: "block", fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-main)", marginBottom: "0.35rem" }}>
+      <div className="merge-output-setting">
+        <label htmlFor="merge-output-name-input" className="merge-output-label">
           Output File Name:
         </label>
         <input
@@ -282,42 +179,26 @@ function MergeRightPanel({
           value={outputFileName}
           onChange={(e) => setOutputFileName(e.target.value)}
           placeholder="merged.pdf"
-          style={{
-            width: "100%",
-            padding: "0.6rem 0.75rem",
-            borderRadius: "var(--radius-md)",
-            border: "1.5px solid var(--border-medium)",
-            fontSize: "0.875rem",
-            outline: "none",
-            boxSizing: "border-box",
-          }}
+          className="merge-output-input"
         />
       </div>
 
       {/* Summary Card */}
-      <div
-        style={{
-          background: "var(--bg-subtle)",
-          border: "1px solid var(--border-light)",
-          borderRadius: "var(--radius-md)",
-          padding: "0.875rem",
-          marginBottom: "1.25rem",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
+      <div className="merge-summary-card">
+        <div className="merge-summary-row">
           <span>Total Documents:</span>
-          <strong style={{ color: "var(--text-main)" }}>{files.length} PDFs</strong>
+          <strong className="merge-summary-val">{files.length} PDFs</strong>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
+        <div className="merge-summary-row">
           <span>Combined Pages:</span>
-          <strong style={{ color: "var(--text-main)" }}>{totalPagesAllFiles} Pages</strong>
+          <strong className="merge-summary-val">{totalPagesAllFiles} Pages</strong>
         </div>
       </div>
 
       {/* Action / Submit Area */}
       <div>
         {!canMerge && (
-          <p style={{ fontSize: "0.75rem", color: "#b45309", background: "#fef3c7", padding: "0.5rem 0.75rem", borderRadius: "6px", marginBottom: "0.75rem" }}>
+          <p className="merge-min-notice">
             Add at least 2 PDF files to enable merging.
           </p>
         )}
@@ -340,7 +221,7 @@ function MergeRightPanel({
         )}
 
         {error ? (
-          <div className="alert-error" role="alert" style={{ marginTop: "1rem" }}>
+          <div className="alert-error workspace-alert" role="alert">
             <span>{error}</span>
           </div>
         ) : null}
@@ -397,11 +278,19 @@ export default function MergeTool() {
     [files, filePagesMap]
   );
 
+  const memoryWarning = useMemo(() => getPayloadMemoryWarning(files), [files]);
+
   /* ── Load Files ──────────────────────────────────────────── */
   async function handleFileSelect(selectedFiles: FileList | File[] | null, append = true) {
     const pdfs = filterPdfFiles(selectedFiles);
     if (pdfs.length === 0) {
       setError("Please select valid PDF files.");
+      return;
+    }
+
+    const validation = validateFilesForUpload(pdfs, append ? files : []);
+    if (validation.error) {
+      setError(validation.error);
       return;
     }
 
@@ -553,19 +442,22 @@ export default function MergeTool() {
     setStatusMessage("Preparing files for merging...");
 
     try {
-      const inputs = await Promise.all(
-        files.map(async (f) => ({
+      const inputs = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        setStatusMessage(`Reading file ${i + 1} of ${files.length}...`);
+        inputs.push({
           name: f.name,
           data: new Uint8Array(await f.arrayBuffer()),
-        }))
-      );
-      if (runId !== runIdRef.current) return;
+        });
+        if (runId !== runIdRef.current) return;
+      }
 
       setStatusMessage(`Merging ${files.length} PDFs...`);
 
       const job = runTool("merge", inputs, {}, (p) => {
         if (runId === runIdRef.current) {
-          setProgress(p);
+          setProgress((prev) => (prev === null ? p : Math.max(prev, p)));
           setStatusMessage(`Merging documents... ${Math.round(p * 100)}%`);
         }
       });
@@ -577,7 +469,7 @@ export default function MergeTool() {
       const finalName = resolveMergedFileName(outputFileName);
 
       const res = outputs.map((out) => {
-        const blob = new Blob([out.data as BlobPart], { type: out.mime || "application/pdf" });
+        const blob = uint8ArrayToBlob(out.data, out.mime);
         return {
           name: finalName,
           url: URL.createObjectURL(blob),
@@ -620,6 +512,7 @@ export default function MergeTool() {
       filesCount={files.length}
       totalPages={totalPagesAllFiles}
       error={error}
+      warning={memoryWarning || undefined}
       fileInputRef={fileInputRef}
       onFilesSelected={(selected, append) => {
         void handleFileSelect(selected, append);

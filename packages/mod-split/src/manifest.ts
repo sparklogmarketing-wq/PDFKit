@@ -19,6 +19,5 @@ export const manifest: ToolManifest = {
     { key: "allowCompression", label: "Allow compression", type: "checkbox", default: true },
     { key: "mergeAll", label: "Merge all ranges in one PDF", type: "checkbox", default: false },
   ],
-  status: "active",
   related: ["merge", "extract", "remove"],
 };

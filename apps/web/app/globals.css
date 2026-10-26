@@ -554,29 +554,6 @@ a {
   margin: 0;
 }
 
-.tool-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1;
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--radius-full);
-  letter-spacing: 0.02em;
-}
-
-.tool-badge.active {
-  background-color: var(--success-subtle);
-  color: var(--success);
-  border: 1px solid var(--success-border);
-}
-
-.tool-badge.planned {
-  background-color: var(--bg-muted);
-  color: var(--text-muted);
-  border: 1px solid var(--border-medium);
-}
-
 /* Tool Runner Card Panel */
 .tool-runner-panel {
   display: flex;
@@ -1423,20 +1400,53 @@ a {
   box-shadow: 0 0 8px rgba(124,58,237,0.4);
 }
 
-/* Error message banner */
-.alert-error {
+/* ==========================================================================
+   Shared Feedback & Alert Banners (.alert-error, .alert-warning, etc.)
+   Single Source of Truth (Ref: docs/CSS_OWNERSHIP.md)
+   ========================================================================== */
+
+.alert-error,
+.alert-warning,
+.alert-success,
+.alert-info {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 1rem 1.25rem;
-  background-color: var(--danger-subtle);
-  border: 1px solid var(--danger-border);
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
   border-radius: var(--radius-md);
-  color: var(--danger);
   font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
-.alert-error svg {
+.alert-error {
+  background: var(--danger-subtle);
+  border: 1.5px solid var(--danger-border);
+  color: var(--danger);
+}
+
+.alert-warning {
+  background: var(--warning-subtle);
+  border: 1.5px solid var(--warning-border);
+  color: #92400e;
+}
+
+.alert-success {
+  background: var(--success-subtle);
+  border: 1.5px solid var(--success-border);
+  color: var(--success);
+}
+
+.alert-info {
+  background: var(--primary-subtle);
+  border: 1.5px solid var(--primary-border);
+  color: var(--primary-dark);
+}
+
+.alert-error svg,
+.alert-warning svg,
+.alert-success svg,
+.alert-info svg {
   flex-shrink: 0;
   margin-top: 0.125rem;
 }
@@ -1866,19 +1876,7 @@ a {
   transform: none;
 }
 
-/* Alert styles */
-.alert-error {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: var(--danger-subtle);
-  border: 1.5px solid var(--danger-border);
-  border-radius: var(--radius-md);
-  color: var(--danger);
-  font-size: 0.875rem;
-  font-weight: 500;
-}
+
 
 /* ── Pages Mode Styles (iLovePDF Extract Mode) ── */
 
@@ -2900,4 +2898,742 @@ a {
   opacity: 1;
   background: rgba(220, 38, 38, 0.15);
   color: #991b1b;
-}
+}
+/* ==========================================================================
+   Tool Workspace Shell (.workspace-*)
+   ========================================================================== */
+
+.workspace-empty-panel {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.workspace-root {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding-bottom: 3rem;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
+
+.workspace-alert {
+  margin-top: 1rem;
+}
+
+.workspace-alert-spaced {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* ==========================================================================
+   Tool Results View (.tool-results-*)
+   ========================================================================== */
+
+.tool-results-panel {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.tool-results-card {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 2.5rem 2rem;
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.tool-results-icon-badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--success-subtle);
+  border: 1.5px solid var(--success-border);
+  color: var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+}
+
+.tool-results-title {
+  font-size: 1.625rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 0.5rem;
+}
+
+.tool-results-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  margin-bottom: 2rem;
+}
+
+.tool-results-alert {
+  max-width: 520px;
+  margin: 0 auto 1.5rem;
+}
+
+.tool-results-zip-wrapper {
+  margin-bottom: 2rem;
+}
+
+.tool-results-zip-btn {
+  font-size: 1.0625rem;
+  padding: 0.875rem 2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  box-shadow: var(--shadow-md);
+}
+
+.tool-results-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  text-align: left;
+  margin-bottom: 2.5rem;
+}
+
+.tool-results-file-list.single-file {
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.tool-results-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+}
+
+.tool-results-file-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.tool-results-file-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.tool-results-file-details {
+  overflow: hidden;
+}
+
+.tool-results-file-name {
+  font-weight: 600;
+  color: var(--text-main);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.tool-results-file-size {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.tool-results-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1.2rem;
+  font-size: 0.875rem;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.tool-results-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.tool-results-reset-btn {
+  padding: 0.65rem 1.75rem;
+}
+
+/* ==========================================================================
+   Merge Tool Right Panel (.merge-settings-*, .merge-seq-*)
+   ========================================================================== */
+
+.merge-settings-header {
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.875rem;
+  border-bottom: 1.5px solid var(--border-light);
+}
+
+.merge-settings-title {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0 0 0.25rem 0;
+}
+
+.merge-settings-desc {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.merge-seq-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.merge-seq-label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.merge-sort-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.merge-sort-btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.merge-sort-btn:hover {
+  background: var(--bg-subtle);
+  color: var(--text-main);
+}
+
+.merge-seq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.merge-seq-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.65rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+}
+
+.merge-seq-item-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+  margin-right: 0.5rem;
+}
+
+.merge-seq-badge {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary-subtle);
+  color: var(--primary);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.merge-seq-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.merge-seq-pages {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+
+.merge-seq-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.merge-seq-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--border-light);
+  background: #ffffff;
+  color: var(--text-main);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.merge-seq-btn:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.merge-seq-remove-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.merge-output-setting {
+  margin-bottom: 1.25rem;
+}
+
+.merge-output-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 0.35rem;
+}
+
+.merge-output-input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-medium);
+  font-size: 0.875rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.merge-output-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+}
+
+.merge-summary-card {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+.merge-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.merge-summary-row:not(:last-child) {
+  margin-bottom: 0.35rem;
+}
+
+.merge-summary-val {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.merge-min-notice {
+  font-size: 0.75rem;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+}
+
+/* ==========================================================================
+   Remove Tool Right Panel & Modal (.remove-settings-*, .remove-metric-*)
+   ========================================================================== */
+
+.remove-settings-header {
+  border-bottom: 1.5px solid var(--border-light);
+  padding-bottom: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.remove-settings-title {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  margin: 0 0 0.35rem 0;
+  color: var(--text-main);
+}
+
+.remove-settings-desc {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.remove-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.remove-metric-card {
+  padding: 0.6rem;
+  border-radius: var(--radius-md);
+  text-align: center;
+  border: 1px solid var(--border-light);
+}
+
+.remove-metric-card-total {
+  background: var(--bg-subtle);
+}
+
+.remove-metric-card-delete {
+  background: #fff5f5;
+  border-color: #fecaca;
+}
+
+.remove-metric-card-keep {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.remove-metric-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.remove-metric-label-total {
+  color: var(--text-secondary);
+}
+
+.remove-metric-label-delete {
+  color: #dc2626;
+}
+
+.remove-metric-label-keep {
+  color: #16a34a;
+}
+
+.remove-metric-val {
+  font-size: 1.125rem;
+  font-weight: 800;
+}
+
+.remove-metric-val-total {
+  color: var(--text-main);
+}
+
+.remove-metric-val-delete {
+  color: #dc2626;
+}
+
+.remove-metric-val-keep {
+  color: #16a34a;
+}
+
+.remove-field-group {
+  margin-bottom: 1.25rem;
+}
+
+.remove-field-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 0.4rem;
+}
+
+.remove-field-input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-medium);
+  font-size: 0.875rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.remove-field-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+}
+
+.remove-field-helper {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin: 0.35rem 0 0 0;
+}
+
+.remove-field-error {
+  font-size: 0.75rem;
+  color: #dc2626;
+  margin: 0.35rem 0 0 0;
+}
+
+.remove-field-actions {
+  margin-top: 0.65rem;
+}
+
+.remove-clear-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.remove-clear-btn:hover {
+  text-decoration: underline;
+}
+
+.remove-all-warning {
+  font-size: 0.75rem;
+  color: #dc2626;
+  text-align: center;
+  margin: 0.5rem 0 0 0;
+}
+
+.remove-confirm-stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+}
+
+.remove-confirm-stat-label {
+  color: var(--text-secondary);
+}
+
+.remove-confirm-stat-delete {
+  color: #dc2626;
+}
+
+.remove-confirm-stat-keep {
+  color: #059669;
+}
+
+.confirm-modal-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.confirm-modal-subtitle {
+  margin: 0.2rem 0 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.confirm-modal-desc {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.confirm-modal-stat-box {
+  background: #fff5f5;
+  border: 1.5px solid #fecaca;
+  border-radius: var(--radius-md);
+  padding: 0.875rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.confirm-modal-info-box {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+}
+
+.confirm-modal-btn-cancel {
+  padding: 0.6rem 1.1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-medium);
+  background: #ffffff;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.confirm-modal-btn-delete {
+  padding: 0.6rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  border-radius: var(--radius-md);
+  border: none;
+  background: #dc2626;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.split-panel-title {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-main);
+}
+
+.split-field-label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.split-checkbox-label {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.split-actions-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin-top: 0.25rem;
+}
+
+.split-full-btn {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   Rotate Tool Classes (.rotate-tab-*, .rotate-card-*)
+   ========================================================================== */
+
+.rotate-tab-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 0.35rem;
+}
+
+.rotate-tab-desc {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.25rem;
+}
+
+.rotate-exclude-box {
+  background: #fffbeb;
+  border: 1.5px solid #fde68a;
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.rotate-exclude-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #92400e;
+  cursor: pointer;
+  margin-bottom: 1rem;
+}
+
+.rotate-range-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #92400e;
+  margin-bottom: 0.25rem;
+}
+
+.rotate-range-input {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid #fde68a;
+  font-size: 0.875rem;
+  font-weight: 700;
+  box-sizing: border-box;
+}
+
+.rotate-range-input.enabled {
+  background: #ffffff;
+}
+
+.rotate-range-input.disabled {
+  background: #fef3c7;
+}
+
+.rotate-quick-btn {
+  flex: 1;
+  padding: 0.3rem 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: #ffffff;
+  color: var(--primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+}
+
+.rotate-global-btn {
+  padding: 1rem 0.5rem;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-medium);
+  background: var(--bg-surface);
+  color: var(--primary);
+  font-weight: 800;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.08);
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
