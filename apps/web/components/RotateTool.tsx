@@ -7,6 +7,7 @@ import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
 import { appendUniqueFiles } from "../lib/format";
+import { validateFilesForUpload, getPayloadMemoryWarning } from "../lib/limits";
 import PdfZoomModal from "./PdfZoomModal";
 import ToolResultsView from "./ToolResultsView";
 import ToolProgressBar from "./ToolProgressBar";
@@ -907,6 +908,12 @@ export default function RotateTool() {
       return;
     }
 
+    const validation = validateFilesForUpload(arr, append ? files : []);
+    if (validation.error) {
+      setError(validation.error);
+      return;
+    }
+
     if (!append) {
       cancelRef.current?.();
       setCancel(null);
@@ -1004,13 +1011,16 @@ export default function RotateTool() {
     setStatusMsg("Preparing files for rotation...");
 
     try {
-      const inputs = await Promise.all(
-        files.map(async (f) => ({
+      const inputs = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        setStatusMsg(`Preparing file ${i + 1} of ${files.length}...`);
+        inputs.push({
           name: f.name,
           data: new Uint8Array(await f.arrayBuffer()),
-        }))
-      );
-      if (runId !== runIdRef.current) return;
+        });
+        if (runId !== runIdRef.current) return;
+      }
 
       let currentGlobalPage = 1;
       const perFileRotations: Record<number, any> = {};
@@ -1099,9 +1109,12 @@ export default function RotateTool() {
   }
 
   /* ── RENDER: Document Rotation Studio ──────────────────────── */
+  const memoryWarning = useMemo(() => getPayloadMemoryWarning(files), [files]);
+
   return (
     <ToolWorkspaceShell
       error={error}
+      warning={memoryWarning || undefined}
       fileInputRef={fileInputRef}
       filesCount={files.length}
       totalPages={totalPagesAllFiles}

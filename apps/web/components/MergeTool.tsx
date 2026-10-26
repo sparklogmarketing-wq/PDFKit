@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { loadPdfPagesMap } from "../lib/pdfjs";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { calculateTotalPages, filterPdfFiles, appendUniqueFiles } from "../lib/format";
+import { validateFilesForUpload, getPayloadMemoryWarning } from "../lib/limits";
 import PdfZoomModal from "./PdfZoomModal";
 import PdfThumbnailCard from "./PdfThumbnailCard";
 import ToolResultsView from "./ToolResultsView";
@@ -405,6 +406,12 @@ export default function MergeTool() {
       return;
     }
 
+    const validation = validateFilesForUpload(pdfs, append ? files : []);
+    if (validation.error) {
+      setError(validation.error);
+      return;
+    }
+
     if (!append) {
       cancelRef.current?.();
       setCancel(null);
@@ -553,13 +560,16 @@ export default function MergeTool() {
     setStatusMessage("Preparing files for merging...");
 
     try {
-      const inputs = await Promise.all(
-        files.map(async (f) => ({
+      const inputs = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        setStatusMessage(`Reading file ${i + 1} of ${files.length}...`);
+        inputs.push({
           name: f.name,
           data: new Uint8Array(await f.arrayBuffer()),
-        }))
-      );
-      if (runId !== runIdRef.current) return;
+        });
+        if (runId !== runIdRef.current) return;
+      }
 
       setStatusMessage(`Merging ${files.length} PDFs...`);
 
@@ -614,12 +624,15 @@ export default function MergeTool() {
     );
   }
 
+  const memoryWarning = useMemo(() => getPayloadMemoryWarning(files), [files]);
+
   /* ── RENDER: Active 2-Column Workspace ───────────────────── */
   return (
     <ToolWorkspaceShell
       filesCount={files.length}
       totalPages={totalPagesAllFiles}
       error={error}
+      warning={memoryWarning || undefined}
       fileInputRef={fileInputRef}
       onFilesSelected={(selected, append) => {
         void handleFileSelect(selected, append);

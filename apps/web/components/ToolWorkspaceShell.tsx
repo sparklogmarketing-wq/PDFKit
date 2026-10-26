@@ -7,6 +7,7 @@ export interface ToolWorkspaceShellProps {
   readonly filesCount: number;
   readonly totalPages: number;
   readonly error?: string;
+  readonly warning?: string;
   readonly fileInputRef: RefObject<HTMLInputElement | null>;
   readonly onFilesSelected: (files: FileList | null, append: boolean) => void;
   readonly allowMultiple?: boolean;
@@ -17,6 +18,7 @@ export default function ToolWorkspaceShell({
   filesCount,
   totalPages,
   error,
+  warning,
   fileInputRef,
   onFilesSelected,
   allowMultiple = true,
@@ -73,8 +75,14 @@ export default function ToolWorkspaceShell({
           badgeText={allowMultiple ? "Multiple files (.pdf)" : "Single PDF file (.pdf)"}
         />
 
+        {warning && !error && (
+          <div className="alert-warning" style={{ marginTop: "1rem" }} role="status">
+            {warning}
+          </div>
+        )}
+
         {error && (
-          <div className="alert-error" style={{ marginTop: "1rem" }}>
+          <div className="alert-error" style={{ marginTop: "1rem" }} role="alert">
             {error}
           </div>
         )}
@@ -115,6 +123,18 @@ export default function ToolWorkspaceShell({
           onClick={() => fileInputRef.current?.click()}
           badgeText={`${filesCount} ${filesCount === 1 ? "PDF" : "PDFs"} selected (${totalPages} pages total)`}
         />
+      )}
+
+      {warning && (
+        <div className="alert-warning" style={{ marginTop: "1rem", marginBottom: "1rem" }} role="status">
+          {warning}
+        </div>
+      )}
+
+      {error && (
+        <div className="alert-error" style={{ marginTop: "1rem", marginBottom: "1rem" }} role="alert">
+          {error}
+        </div>
       )}
 
       {children}

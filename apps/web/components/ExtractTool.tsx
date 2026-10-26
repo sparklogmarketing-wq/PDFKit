@@ -7,6 +7,7 @@ import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
 import { formatPageRanges, parsePageRanges } from "../lib/pageRanges";
+import { validateFilesForUpload } from "../lib/limits";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
 
@@ -161,6 +162,13 @@ export default function ExtractTool() {
 
     setError(null);
     setResults(null);
+
+    const validation = validateFilesForUpload([selectedFile]);
+    if (validation.error) {
+      setError(validation.error);
+      return;
+    }
+
     try {
       const info = await getPdfInfo(selectedFile);
       if (loadId !== loadIdRef.current) return;

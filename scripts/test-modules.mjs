@@ -10,7 +10,12 @@ import {
   formatPageIndices as coreFormatPageIndices,
   PageRangeError,
   ToolError,
+  PayloadLimitError,
+  DEFAULT_PAYLOAD_LIMITS,
+  validatePayloadLimits,
+  getPayloadMemoryWarning,
 } from "../packages/core/src/index.ts";
+import { validateFilesForUpload } from "../apps/web/lib/limits.ts";
 import mergeMod from "../packages/mod-merge/src/index.ts";
 import splitMod, { DEFAULT_MAX_SIZE_BYTES } from "../packages/mod-split/src/index.ts";
 import rotateMod from "../packages/mod-rotate/src/index.ts";
@@ -1745,5 +1750,122 @@ test("Accessibility: modal focus trap and keyboard page selection/reordering (Is
     // Moving index 0 to last
     handleMovePage(0, 2);
     assert.deepEqual(pages.map((p) => p.id), ["p1", "p3", "p2"]);
+  });
+});
+
+test("Payload limits and memory warnings (Issue #29)", async (t) => {
+  await t.test("rejects more than default maxFileCount files (50 files)", () => {
+    const files = Array.from({ length: 51 }, (_, i) => ({
+      name: `doc-${i + 1}.pdf`,
+      size: 1000,
+    }));
+    assert.throws(
+      () => validatePayloadLimits(files),
+      (err) => {
+        assert.ok(err instanceof PayloadLimitError);
+        assert.equal(err.code, "TOO_MANY_FILES");
+        assert.equal(err.limit, 50);
+        assert.equal(err.actual, 51);
+        assert.match(err.message, /Too many files/);
+        return true;
+      }
+    );
+  });
+
+  await t.test("rejects single file exceeding default maxFileSizeBytes (100 MB)", () => {
+    const files = [
+      { name: "large.pdf", size: 100 * 1024 * 1024 + 1 },
+    ];
+    assert.throws(
+      () => validatePayloadLimits(files),
+      (err) => {
+        assert.ok(err instanceof PayloadLimitError);
+        assert.equal(err.code, "FILE_TOO_LARGE");
+        assert.equal(err.fileName, "large.pdf");
+        assert.equal(err.limit, 100 * 1024 * 1024);
+        assert.match(err.message, /exceeds the maximum allowed size of 100 MB/);
+        return true;
+      }
+    );
+  });
+
+  await t.test("rejects total payload exceeding default maxTotalSizeBytes (250 MB)", () => {
+    const files = [
+      { name: "doc1.pdf", size: 90 * 1024 * 1024 },
+      { name: "doc2.pdf", size: 90 * 1024 * 1024 },
+      { name: "doc3.pdf", size: 80 * 1024 * 1024 },
+    ];
+    assert.throws(
+      () => validatePayloadLimits(files),
+      (err) => {
+        assert.ok(err instanceof PayloadLimitError);
+        assert.equal(err.code, "TOTAL_SIZE_TOO_LARGE");
+        assert.equal(err.limit, 250 * 1024 * 1024);
+        assert.match(err.message, /Total files size.*exceeds the maximum allowed total of 250 MB/);
+        return true;
+      }
+    );
+  });
+
+  await t.test("accepts valid inputs within limits", () => {
+    const files = [
+      { name: "doc1.pdf", size: 10 * 1024 * 1024 },
+      { name: "doc2.pdf", size: 20 * 1024 * 1024 },
+    ];
+    assert.doesNotThrow(() => validatePayloadLimits(files));
+  });
+
+  await t.test("honors custom limits", () => {
+    const custom = {
+      maxFileSizeBytes: 1024 * 1024,
+      maxTotalSizeBytes: 2 * 1024 * 1024,
+      maxFileCount: 3,
+      warningTotalSizeBytes: 500 * 1024,
+      warningFileCount: 2,
+    };
+    assert.throws(
+      () => validatePayloadLimits([{ size: 100 }, { size: 100 }, { size: 100 }, { size: 100 }], custom),
+      (err) => err instanceof PayloadLimitError && err.code === "TOO_MANY_FILES" && err.limit === 3
+    );
+    assert.throws(
+      () => validatePayloadLimits([{ size: 2 * 1024 * 1024 }], custom),
+      (err) => err instanceof PayloadLimitError && err.code === "FILE_TOO_LARGE" && err.limit === 1024 * 1024
+    );
+  });
+
+  await t.test("getPayloadMemoryWarning provides memory warning thresholds", () => {
+    assert.equal(getPayloadMemoryWarning([{ size: 10 * 1024 * 1024 }]), null);
+
+    const largeWarning = getPayloadMemoryWarning([
+      { size: 30 * 1024 * 1024 },
+      { size: 25 * 1024 * 1024 },
+    ]);
+    assert.ok(largeWarning);
+    assert.match(largeWarning, /Large operation/);
+    assert.match(largeWarning, /55 MB/);
+
+    const countWarning = getPayloadMemoryWarning(
+      Array.from({ length: 22 }, () => ({ size: 1024 }))
+    );
+    assert.ok(countWarning);
+    assert.match(countWarning, /22 files/);
+  });
+
+  await t.test("validateFilesForUpload integrates cleanly with file lists", () => {
+    const mockFiles = [
+      { name: "ok.pdf", size: 5 * 1024 * 1024 },
+    ];
+    const okResult = validateFilesForUpload(mockFiles);
+    assert.equal(okResult.error, null);
+    assert.equal(okResult.valid.length, 1);
+
+    const overResult = validateFilesForUpload(
+      [{ name: "oversized.pdf", size: 150 * 1024 * 1024 }],
+      mockFiles
+    );
+    assert.ok(overResult.error);
+    assert.match(overResult.error, /oversized\.pdf/);
+    assert.match(overResult.error, /100 MB/);
+    assert.equal(overResult.valid.length, 0);
   });
 });

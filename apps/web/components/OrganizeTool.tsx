@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
+import { validateFilesForUpload, getPayloadMemoryWarning } from "../lib/limits";
 import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { formatBytes } from "../lib/formatBytes";
@@ -408,6 +409,7 @@ export default function OrganizeTool() {
 
   const isRunning = progress !== null;
   const hasRealPages = pages.some((p) => !p.isBlank);
+  const memoryWarning = useMemo(() => getPayloadMemoryWarning(files.map((f) => f.file)), [files]);
 
   /* Cleanup URLs and cancel active job on unmount */
   useEffect(() => {
@@ -425,6 +427,13 @@ export default function OrganizeTool() {
       );
       if (arr.length === 0) {
         setError("Please select valid PDF files.");
+        return;
+      }
+
+      const existingFiles = files.map((entry) => entry.file);
+      const validation = validateFilesForUpload(arr, existingFiles);
+      if (validation.error) {
+        setError(validation.error);
         return;
       }
       setError("");
@@ -748,13 +757,16 @@ export default function OrganizeTool() {
 
     try {
       // 1. Prepare raw input files
-      const inputFiles = await Promise.all(
-        files.map(async (f) => ({
+      const inputFiles = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        setStatusMsg(`Preparing file ${i + 1} of ${files.length}…`);
+        inputFiles.push({
           name: f.file.name,
           data: new Uint8Array(await f.file.arrayBuffer()),
-        }))
-      );
-      if (runId !== runIdRef.current) return;
+        });
+        if (runId !== runIdRef.current) return;
+      }
 
       // 2. Prepare pages spec
       const pagesSpec = pages.map((p) => ({
@@ -920,6 +932,16 @@ export default function OrganizeTool() {
             Organize complete — 1 file ready
           </strong>
         </div>
+
+        {memoryWarning && (
+          <div
+            role="status"
+            className="alert-warning"
+            style={{ marginBottom: "1rem" }}
+          >
+            {memoryWarning}
+          </div>
+        )}
 
         {error && (
           <div

@@ -6,6 +6,7 @@ import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatPageRanges, parsePageRanges } from "../lib/pageRanges";
+import { validateFilesForUpload } from "../lib/limits";
 import { formatBytes } from "../lib/formatBytes";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
@@ -376,6 +377,12 @@ export default function SplitTool() {
   async function loadFile(f: File) {
     if (!f.name.toLowerCase().endsWith(".pdf")) {
       setError("Please select a PDF file.");
+      return;
+    }
+
+    const validation = validateFilesForUpload([f]);
+    if (validation.error) {
+      setError(validation.error);
       return;
     }
     cancelRef.current?.();

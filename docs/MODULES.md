@@ -44,3 +44,19 @@ Shared (non-tool) packages to add next: `packages/viewer` (pdfjs React viewer), 
 - **Atomic Operations**: No silent filtering or partial page removals occur. Deduplication happens only after every index passes validation.
 
 
+
+## Payload & Memory Limits (Web & Core)
+
+To protect client-side browsers and Web Workers from out-of-memory crashes, strict input validation limits are defined centrally in `@pdfkit/core`:
+
+| Limit Parameter | Default Value | Description |
+|---|---|---|
+| `maxFileSizeBytes` | 100 MB (`100 * 1024 * 1024`) | Maximum allowed size per input file. |
+| `maxTotalSizeBytes` | 250 MB (`250 * 1024 * 1024`) | Maximum cumulative size across all input files. |
+| `maxFileCount` | 50 files | Maximum number of concurrent input files. |
+| `warningTotalSizeBytes` | 50 MB (`50 * 1024 * 1024`) | Threshold to trigger memory warning banner. |
+| `warningFileCount` | 20 files | File count threshold to trigger memory warning banner. |
+
+- **Upfront Validation**: Validated on file selection/drop via native `File.size` before reading data into memory (`arrayBuffer()`), as well as inside `runTool()` prior to worker dispatch.
+- **Sequential ArrayBuffer Reading**: Large batches read ArrayBuffers sequentially (`for ... of`) rather than concurrently (`Promise.all`) to avoid memory allocation spikes.
+- **PayloadLimitError**: Throws structured errors with `code: "FILE_TOO_LARGE" | "TOO_MANY_FILES" | "TOTAL_SIZE_TOO_LARGE"` detailing `limit`, `actual`, and offending `fileName`.

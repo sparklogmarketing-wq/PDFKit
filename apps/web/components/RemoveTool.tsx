@@ -7,6 +7,7 @@ import { runTool, isCancelledError } from "../lib/runTool";
 import { formatBytes } from "../lib/formatBytes";
 import { formatPagesToRangeString } from "../lib/format";
 import { parsePageSpec } from "@pdfkit/core";
+import { validateFilesForUpload } from "../lib/limits";
 import PdfZoomModal from "./PdfZoomModal";
 import ToolResultsView from "./ToolResultsView";
 import ToolProgressBar from "./ToolProgressBar";
@@ -582,6 +583,12 @@ export default function RemoveTool() {
     const loadId = ++loadIdRef.current;
 
     const selectedFile = pdfs[0];
+    const validation = validateFilesForUpload([selectedFile]);
+    if (validation.error) {
+      setError(validation.error);
+      return;
+    }
+
     setError("");
     setResults([]);
     setProgress(null);
