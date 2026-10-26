@@ -251,10 +251,10 @@ function RotateControlsTab({
 }) {
   return (
     <div>
-      <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.35rem" }}>
+      <h3 className="rotate-tab-title">
         Rotate Controls
       </h3>
-      <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
+      <p className="rotate-tab-desc">
         Choose rotation direction for all selected PDFs. Pages configured in tabs 2 & 3 will remain protected.
       </p>
 
@@ -366,10 +366,10 @@ function RotateRangeTab({
 }) {
   return (
     <div>
-      <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.35rem" }}>
+      <h3 className="rotate-tab-title">
         Range to NOT Rotate
       </h3>
-      <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
+      <p className="rotate-tab-desc">
         Select a range of page numbers (e.g. from 1 to {Math.min(totalPagesAllFiles || 1, 3)}) that should stay in their original state and NOT be rotated.
       </p>
 
@@ -407,7 +407,7 @@ function RotateRangeTab({
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
           <div>
-            <label htmlFor="range-from-input" style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#92400e", marginBottom: "0.25rem" }}>
+            <label htmlFor="range-from-input" className="rotate-range-label">
               From Page:
             </label>
             <input
@@ -431,7 +431,7 @@ function RotateRangeTab({
           </div>
 
           <div>
-            <label htmlFor="range-to-input" style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#92400e", marginBottom: "0.25rem" }}>
+            <label htmlFor="range-to-input" className="rotate-range-label">
               To Page:
             </label>
             <input
@@ -494,10 +494,10 @@ function RotatePagesTab({
 }) {
   return (
     <div>
-      <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "0.35rem" }}>
+      <h3 className="rotate-tab-title">
         Specific Pages to NOT Rotate
       </h3>
-      <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1.25rem" }}>
+      <p className="rotate-tab-desc">
         Enter individual page numbers that should NOT be rotated and stay in their original state.
       </p>
 
@@ -851,6 +851,8 @@ export default function RotateTool() {
     return files.reduce((acc, f) => acc + (filePagesMap[f.name] || 0), 0);
   }, [files, filePagesMap]);
 
+  const memoryWarning = useMemo(() => getPayloadMemoryWarning(files), [files]);
+
   /* Maximum pages in any single loaded file */
   const maxSingleFilePages = useMemo(() => {
     return files.reduce((acc, f) => Math.max(acc, filePagesMap[f.name] || 0), 0) || 1;
@@ -1109,7 +1111,6 @@ export default function RotateTool() {
   }
 
   /* ── RENDER: Document Rotation Studio ──────────────────────── */
-  const memoryWarning = useMemo(() => getPayloadMemoryWarning(files), [files]);
 
   return (
     <ToolWorkspaceShell

@@ -217,10 +217,10 @@ function FinalDeleteConfirmModal({
             </svg>
           </div>
           <div>
-            <h3 id="confirm-modal-title" style={{ margin: 0, fontSize: "1.125rem", fontWeight: 800, color: "var(--text-main)" }}>
+            <h3 id="confirm-modal-title" className="confirm-modal-title">
               Confirm Page Deletion
             </h3>
-            <p style={{ margin: "0.2rem 0 0 0", fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
+            <p className="confirm-modal-subtitle">
               Please review the pages you are removing.
             </p>
           </div>
@@ -228,41 +228,22 @@ function FinalDeleteConfirmModal({
 
         {/* Modal Body */}
         <div className="confirm-modal-body">
-          <p style={{ margin: 0, fontSize: "0.9375rem", color: "var(--text-main)", lineHeight: 1.5 }}>
+          <p className="confirm-modal-desc">
             You are about to delete <strong>{deleteCount} {deleteCount === 1 ? "page" : "pages"}</strong> from <strong>{fileName}</strong>.
           </p>
 
-          <div
-            style={{
-              background: "#fff5f5",
-              border: "1.5px solid #fecaca",
-              borderRadius: "var(--radius-md)",
-              padding: "0.875rem 1rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.4rem",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem" }}>
-              <span style={{ color: "var(--text-secondary)" }}>Pages to delete:</span>
-              <strong style={{ color: "#dc2626" }}>{deletedRangeString || `Count: ${deleteCount}`}</strong>
+          <div className="confirm-modal-stat-box">
+            <div className="remove-confirm-stat-row">
+              <span className="remove-confirm-stat-label">Pages to delete:</span>
+              <strong className="remove-confirm-stat-delete">{deletedRangeString || `Count: ${deleteCount}`}</strong>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem" }}>
-              <span style={{ color: "var(--text-secondary)" }}>Pages remaining:</span>
-              <strong style={{ color: "#059669" }}>{remainingCount} {remainingCount === 1 ? "page" : "pages"}</strong>
+            <div className="remove-confirm-stat-row">
+              <span className="remove-confirm-stat-label">Pages remaining:</span>
+              <strong className="remove-confirm-stat-keep">{remainingCount} {remainingCount === 1 ? "page" : "pages"}</strong>
             </div>
           </div>
 
-          <div
-            style={{
-              fontSize: "0.8125rem",
-              color: "var(--text-secondary)",
-              background: "var(--bg-subtle)",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-md)",
-              border: "1px solid var(--border-light)",
-            }}
-          >
+          <div className="confirm-modal-info-box">
             Your original document will not be modified. A new PDF with the remaining pages will be downloaded.
           </div>
         </div>
@@ -272,16 +253,7 @@ function FinalDeleteConfirmModal({
           <button
             type="button"
             onClick={onCancel}
-            style={{
-              padding: "0.6rem 1.1rem",
-              fontSize: "0.875rem",
-              fontWeight: 700,
-              borderRadius: "var(--radius-md)",
-              border: "1.5px solid var(--border-medium)",
-              background: "#ffffff",
-              color: "var(--text-main)",
-              cursor: "pointer",
-            }}
+            className="confirm-modal-btn-cancel"
           >
             Cancel
           </button>
@@ -289,20 +261,7 @@ function FinalDeleteConfirmModal({
           <button
             type="button"
             onClick={onConfirm}
-            style={{
-              padding: "0.6rem 1.25rem",
-              fontSize: "0.875rem",
-              fontWeight: 800,
-              borderRadius: "var(--radius-md)",
-              border: "none",
-              background: "#dc2626",
-              color: "#ffffff",
-              cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(220, 38, 38, 0.3)",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-            }}
+            className="confirm-modal-btn-delete"
           >
             <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6"></polyline>
@@ -358,51 +317,38 @@ function RemoveRightPanel({
   return (
     <div className="tool-sticky-panel">
       {/* Document info */}
-      <div
-        style={{
-          borderBottom: "1.5px solid var(--border-light)",
-          paddingBottom: "1rem",
-          marginBottom: "1.25rem",
-        }}
-      >
-        <h3 style={{ fontSize: "1.0625rem", fontWeight: 800, margin: "0 0 0.35rem 0", color: "var(--text-main)" }}>
+      <div className="remove-settings-header">
+        <h3 className="remove-settings-title">
           Remove Pages Settings
         </h3>
-        <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
+        <p className="remove-settings-desc">
           {fileName} ({formatBytes(fileSize)})
         </p>
       </div>
 
       {/* Pages Metric Summary */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          gap: "0.5rem",
-          marginBottom: "1.25rem",
-        }}
-      >
-        <div style={{ background: "var(--bg-subtle)", padding: "0.6rem", borderRadius: "var(--radius-md)", textAlign: "center", border: "1px solid var(--border-light)" }}>
-          <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: 600 }}>Total</div>
-          <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--text-main)" }}>{numPages}</div>
+      <div className="remove-metrics-grid">
+        <div className="remove-metric-card remove-metric-card-total">
+          <div className="remove-metric-label remove-metric-label-total">Total</div>
+          <div className="remove-metric-val remove-metric-val-total">{numPages}</div>
         </div>
 
-        <div style={{ background: "#fff5f5", padding: "0.6rem", borderRadius: "var(--radius-md)", textAlign: "center", border: "1px solid #fecaca" }}>
-          <div style={{ fontSize: "0.75rem", color: "#dc2626", fontWeight: 600 }}>To Delete</div>
-          <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "#dc2626" }}>{deletedCount}</div>
+        <div className="remove-metric-card remove-metric-card-delete">
+          <div className="remove-metric-label remove-metric-label-delete">To Delete</div>
+          <div className="remove-metric-val remove-metric-val-delete">{deletedCount}</div>
         </div>
 
-        <div style={{ background: "#f0fdf4", padding: "0.6rem", borderRadius: "var(--radius-md)", textAlign: "center", border: "1px solid #bbf7d0" }}>
-          <div style={{ fontSize: "0.75rem", color: "#16a34a", fontWeight: 600 }}>To Keep</div>
-          <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "#16a34a" }}>{remainingCount}</div>
+        <div className="remove-metric-card remove-metric-card-keep">
+          <div className="remove-metric-label remove-metric-label-keep">To Keep</div>
+          <div className="remove-metric-val remove-metric-val-keep">{remainingCount}</div>
         </div>
       </div>
 
       {/* Pages / Range input field */}
-      <div style={{ marginBottom: "1.25rem" }}>
+      <div className="remove-field-group">
         <label
           htmlFor="range-delete-input"
-          style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, color: "var(--text-main)", marginBottom: "0.4rem" }}
+          className="remove-field-label"
         >
           Type Pages or Range to Delete:
         </label>
@@ -413,43 +359,25 @@ function RemoveRightPanel({
           onChange={(e) => onRangeInputChange(e.target.value)}
           placeholder="e.g. 1, 3-5, 8"
           disabled={isRunning}
-          style={{
-            width: "100%",
-            padding: "0.65rem 0.875rem",
-            border: rangeError ? "1.5px solid #dc2626" : "1.5px solid var(--border-medium)",
-            borderRadius: "var(--radius-md)",
-            fontSize: "0.9375rem",
-            fontWeight: 600,
-            outline: "none",
-            boxSizing: "border-box",
-          }}
+          className="remove-field-input"
         />
         {rangeError ? (
-          <p role="alert" style={{ fontSize: "0.75rem", color: "#dc2626", margin: "0.35rem 0 0 0" }}>
+          <p role="alert" className="remove-field-error">
             {rangeError}
           </p>
         ) : (
-          <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: "0.35rem 0 0 0" }}>
+          <p className="remove-field-helper">
             Enter individual pages or ranges separated by commas (e.g. 1, 3-5).
           </p>
         )}
 
         {/* Quick action button */}
         {deletedCount > 0 && (
-          <div style={{ marginTop: "0.65rem" }}>
+          <div className="remove-field-actions">
             <button
               type="button"
               onClick={onClearSelection}
-              style={{
-                fontSize: "0.75rem",
-                fontWeight: 700,
-                padding: "0.25rem 0.5rem",
-                borderRadius: "4px",
-                border: "1px solid var(--border-light)",
-                background: "#ffffff",
-                color: "#dc2626",
-                cursor: "pointer",
-              }}
+              className="remove-clear-btn"
             >
               Clear Selection
             </button>
@@ -458,10 +386,10 @@ function RemoveRightPanel({
       </div>
 
       {/* Output file name */}
-      <div style={{ marginBottom: "1.5rem" }}>
+      <div className="remove-field-group">
         <label
           htmlFor="output-file-name"
-          style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, color: "var(--text-main)", marginBottom: "0.4rem" }}
+          className="remove-field-label"
         >
           Save Output As:
         </label>
@@ -471,16 +399,7 @@ function RemoveRightPanel({
           value={outputFileName}
           onChange={(e) => setOutputFileName(e.target.value)}
           disabled={isRunning}
-          style={{
-            width: "100%",
-            padding: "0.65rem 0.875rem",
-            border: "1.5px solid var(--border-medium)",
-            borderRadius: "var(--radius-md)",
-            fontSize: "0.875rem",
-            fontWeight: 600,
-            outline: "none",
-            boxSizing: "border-box",
-          }}
+          className="remove-field-input"
         />
       </div>
 
@@ -508,7 +427,7 @@ function RemoveRightPanel({
           </button>
 
           {!canDelete && remainingCount === 0 && deletedCount > 0 && (
-            <p style={{ fontSize: "0.75rem", color: "#dc2626", textAlign: "center", margin: "0.5rem 0 0 0" }}>
+            <p className="remove-all-warning">
               At least 1 page must remain in the document.
             </p>
           )}
@@ -516,7 +435,7 @@ function RemoveRightPanel({
       )}
 
       {error ? (
-        <div className="alert-error" role="alert" style={{ marginTop: "1rem" }}>
+        <div className="alert-error workspace-alert" role="alert">
           <span>{error}</span>
         </div>
       ) : null}

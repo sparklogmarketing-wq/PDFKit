@@ -52,7 +52,7 @@ export default function ToolWorkspaceShell({
 
   if (filesCount === 0) {
     return (
-      <div className="tool-runner-panel" style={{ maxWidth: 860, margin: "0 auto" }}>
+      <div className="tool-runner-panel workspace-empty-panel">
         <input
           ref={fileInputRef}
           type="file"
@@ -76,13 +76,13 @@ export default function ToolWorkspaceShell({
         />
 
         {warning && !error && (
-          <div className="alert-warning" style={{ marginTop: "1rem" }} role="status">
+          <div className="alert-warning workspace-alert" role="status">
             {warning}
           </div>
         )}
 
         {error && (
-          <div className="alert-error" style={{ marginTop: "1rem" }} role="alert">
+          <div className="alert-error workspace-alert" role="alert">
             {error}
           </div>
         )}
@@ -91,16 +91,7 @@ export default function ToolWorkspaceShell({
   }
 
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: "100%",
-        margin: "0 auto",
-        paddingBottom: "3rem",
-        overflowX: "clip",
-        boxSizing: "border-box",
-      }}
-    >
+    <div className="workspace-root">
       <input
         ref={fileInputRef}
         type="file"
@@ -126,13 +117,13 @@ export default function ToolWorkspaceShell({
       )}
 
       {warning && (
-        <div className="alert-warning" style={{ marginTop: "1rem", marginBottom: "1rem" }} role="status">
+        <div className="alert-warning workspace-alert-spaced" role="status">
           {warning}
         </div>
       )}
 
       {error && (
-        <div className="alert-error" style={{ marginTop: "1rem", marginBottom: "1rem" }} role="alert">
+        <div className="alert-error workspace-alert-spaced" role="alert">
           {error}
         </div>
       )}

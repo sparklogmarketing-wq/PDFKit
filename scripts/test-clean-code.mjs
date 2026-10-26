@@ -69,3 +69,47 @@ test("Code hygiene, dead code removal, and deduplication (Issue #30)", async (t)
     assert.strictEqual(formatBytesReexport(1536), "1.5 KB");
   });
 });
+
+test("Duplicate CSS removal and inline styles consolidation (Issue #31)", async (t) => {
+  await t.test(".alert-error is defined exactly once in globals.css as single source of truth", () => {
+    const css = fs.readFileSync("apps/web/app/globals.css", "utf8");
+    const matches = css.match(/^\.alert-error\s*\{/gm);
+    assert.strictEqual(
+      matches ? matches.length : 0,
+      1,
+      ".alert-error declaration block must appear exactly once in globals.css"
+    );
+  });
+
+  await t.test("CSS ownership and architecture documentation exists", () => {
+    assert.strictEqual(
+      fs.existsSync("docs/CSS_OWNERSHIP.md"),
+      true,
+      "docs/CSS_OWNERSHIP.md must exist"
+    );
+    const doc = fs.readFileSync("docs/CSS_OWNERSHIP.md", "utf8");
+    assert.ok(doc.includes("Ownership Layers"));
+    assert.ok(doc.includes("Single Source of Truth"));
+    assert.ok(doc.includes("Semantic Classes over Inline Styles"));
+  });
+
+  await t.test("Consolidated high-duplication components have zero or significantly reduced inline styles", () => {
+    const checkInlineStyles = (filePath) => {
+      const content = fs.readFileSync(filePath, "utf8");
+      const matches = content.match(/style=\{\{/g);
+      return matches ? matches.length : 0;
+    };
+
+    // ToolWorkspaceShell should have 0 inline styles
+    assert.strictEqual(checkInlineStyles("apps/web/components/ToolWorkspaceShell.tsx"), 0);
+
+    // ToolResultsView should have 0 inline styles
+    assert.strictEqual(checkInlineStyles("apps/web/components/ToolResultsView.tsx"), 0);
+
+    // MergeTool should have 0 inline styles
+    assert.strictEqual(checkInlineStyles("apps/web/components/MergeTool.tsx"), 0);
+
+    // RemoveTool should have <= 15 inline styles (reduced from 50)
+    assert.ok(checkInlineStyles("apps/web/components/RemoveTool.tsx") <= 15);
+  });
+});

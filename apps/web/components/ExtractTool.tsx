@@ -602,13 +602,13 @@ export default function ExtractTool() {
 
         {/* RIGHT: Config sidebar */}
         <div className="split-config-panel">
-          <h2 style={{ fontSize: "1.0625rem", fontWeight: 700, margin: 0, color: "var(--text-main)" }}>
+          <h2 className="split-panel-title">
             Extract Pages
           </h2>
 
           {/* Mode switch */}
           <div className="split-submode-row">
-            <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+            <label className="split-field-label">
               Extract mode:
             </label>
             <div className="split-submode-tabs">
@@ -657,7 +657,7 @@ export default function ExtractTool() {
               checked={mergeAll}
               onChange={(e) => setMergeAll(e.target.checked)}
             />
-            <span style={{ fontWeight: 600, color: "var(--text-main)" }}>
+            <span className="split-checkbox-label">
               Merge extracted pages into one PDF
             </span>
           </label>
@@ -748,7 +748,7 @@ export default function ExtractTool() {
           )}
 
           {/* Action buttons */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem", marginTop: "0.25rem" }}>
+          <div className="split-actions-stack">
             {isRunning ? (
               <button
                 type="button"
@@ -783,7 +783,7 @@ export default function ExtractTool() {
               </button>
             )}
 
-            <button type="button" className="btn-secondary" onClick={handleReset} style={{ width: "100%", boxSizing: "border-box" }}>
+            <button type="button" className="btn-secondary split-full-btn" onClick={handleReset}>
               Choose different file
             </button>
           </div>
