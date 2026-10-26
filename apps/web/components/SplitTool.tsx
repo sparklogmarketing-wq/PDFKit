@@ -6,6 +6,7 @@ import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatPageRanges, parsePageRanges } from "../lib/pageRanges";
+import { formatBytes } from "../lib/formatBytes";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
 
@@ -661,12 +662,6 @@ export default function SplitTool() {
     setProgress(null);
     setStatusMsg("");
     setCancel(null);
-  }
-
-  function formatBytes(b: number) {
-    if (b < 1024) return `${b} B`;
-    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-    return `${(b / 1024 / 1024).toFixed(2)} MB`;
   }
 
   /* ── Render: Dropzone ───────────────────────────────────── */

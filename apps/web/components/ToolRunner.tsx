@@ -5,20 +5,18 @@ import type { FieldDef, OutputFile, ToolManifest } from "@pdfkit/core";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { appendUniqueFiles } from "../lib/format";
+import { formatBytes } from "../lib/formatBytes";
 import PdfThumbnailCard from "./PdfThumbnailCard";
 import PdfZoomModal from "./PdfZoomModal";
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-}
 
 const defaults = (fields: FieldDef[]) =>
   Object.fromEntries(fields.map((f) => [f.key, (f as any).default ?? ""]));
 
+/**
+ * Generic Tool Runner fallback component.
+ * Renders dynamically configured form fields and runners for tools without a custom dedicated UI
+ * (e.g., newly scaffolded tools via `npm run new:module`).
+ */
 export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
   const [files, setFiles] = useState<File[]>([]);
   const [opts, setOpts] = useState<Record<string, any>>(defaults(manifest.fields));

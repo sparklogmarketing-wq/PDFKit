@@ -24,6 +24,7 @@ import "./test-download-zip.mjs";
 import "./test-duplicate-files.mjs";
 import "./test-manifests.mjs";
 import "./test-tooling.mjs";
+import "./test-clean-code.mjs";
 import { formatPageRanges, parsePageRanges } from "../apps/web/lib/pageRanges.ts";
 
 async function createSamplePdf(pages = 3) {

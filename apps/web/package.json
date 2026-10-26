@@ -23,7 +23,6 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@types/jszip": "^3.4.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
