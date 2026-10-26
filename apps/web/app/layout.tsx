@@ -1,10 +1,15 @@
+import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
-export const metadata = {
-  title: "PDFKit",
-  description: "Merge, split, and rotate PDFs in your browser.",
+export const metadata: Metadata = {
+  title: {
+    default: "PDFKit — Free Online PDF Tools",
+    template: "%s | PDFKit",
+  },
+  description: "Merge, split, and rotate PDFs in your browser. Fast, free, and private.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://pdfkit.org"),
 };
 
 export const viewport = {
