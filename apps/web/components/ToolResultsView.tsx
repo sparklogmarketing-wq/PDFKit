@@ -1,6 +1,6 @@
 "use client";
 
-import { formatBytes } from "../lib/format";
+import { formatBytes } from "../lib/formatBytes";
 
 export interface ToolResultItem {
   readonly name: string;

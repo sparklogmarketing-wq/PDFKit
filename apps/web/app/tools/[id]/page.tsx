@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ToolIcon } from "../../../components/ToolIcon";
@@ -5,10 +6,21 @@ import { manifests } from "../../../lib/registry";
 import { getRelatedTools } from "../../../lib/relatedTools";
 import { ToolView } from "../../../lib/toolComponents";
 
+import { getToolMetadataById } from "../../../lib/toolMetadata";
+
 export const dynamicParams = false;
 
 export function generateStaticParams() {
   return manifests.map((m) => ({ id: m.id }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  readonly params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  return getToolMetadataById(id);
 }
 
 export default async function ToolPage({ params }: { readonly params: Promise<{ id: string }> }) {

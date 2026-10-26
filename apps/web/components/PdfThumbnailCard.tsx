@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { usePdfThumbnail } from "../lib/usePdfThumbnail";
-import { formatBytes, formatPageCount } from "../lib/format";
+import { formatBytes } from "../lib/formatBytes";
+import { formatPageCount } from "../lib/format";
 
 interface PdfThumbnailCardProps {
   readonly file: File;

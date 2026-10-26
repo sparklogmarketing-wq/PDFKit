@@ -26,10 +26,17 @@ const mod: ToolModule<{
   allowCompression?: boolean;
 }> = {
   manifest,
-  async run([file], opts, ctx) {
+  async run(inputs, opts, ctx) {
     checkAborted(ctx.signal);
+    if (!inputs || inputs.length === 0 || !inputs[0] || !inputs[0].data) {
+      throw new ToolError("No PDF file provided to split.");
+    }
+    const file = inputs[0];
     const src = await PDFDocument.load(file.data);
     const total = src.getPageCount();
+    if (total === 0) {
+      throw new ToolError("The provided PDF has no pages.");
+    }
     let groups: number[][];
 
     if (opts.mode === "size") {
@@ -76,7 +83,7 @@ const mod: ToolModule<{
     }
 
     if (!groups.length) throw new ToolError("No page ranges given.");
-    const base = file.name.replace(/\.pdf$/i, "");
+    const base = (file.name || "split").replace(/\.pdf$/i, "");
 
     if (opts.mergeAll) {
       checkAborted(ctx.signal);

@@ -23,6 +23,9 @@ import "./test-stale-async.mjs";
 import "./test-download-zip.mjs";
 import "./test-duplicate-files.mjs";
 import "./test-manifests.mjs";
+import "./test-tooling.mjs";
+import "./test-clean-code.mjs";
+import "./test-seo-and-error-boundaries.mjs";
 import { formatPageRanges, parsePageRanges } from "../apps/web/lib/pageRanges.ts";
 
 async function createSamplePdf(pages = 3) {
@@ -32,6 +35,11 @@ async function createSamplePdf(pages = 3) {
     page.drawText(`Page ${i + 1}`);
   }
   return await doc.save();
+}
+
+function createZeroPagePdf() {
+  const minimalPdf = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [] /Count 0 >>\nendobj\nxref\n0 3\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \ntrailer\n<< /Size 3 /Root 1 0 R >>\nstartxref\n115\n%%EOF";
+  return Buffer.from(minimalPdf);
 }
 
 test("parsePageSpec", async (t) => {
@@ -341,6 +349,48 @@ test("mod-split", async (t) => {
     const doc = await PDFDocument.load(results[0].data);
     assert.equal(doc.getPageCount(), 5);
   });
+
+  await t.test("rejects missing, empty, or undefined input with actionable ToolError", async () => {
+    await assert.rejects(
+      async () => await splitMod.run([], { mode: "every", n: 1 }, ctx),
+      (err) => {
+        assert.ok(err instanceof ToolError);
+        assert.match(err.message, /No PDF file provided to split/i);
+        return true;
+      }
+    );
+
+    await assert.rejects(
+      async () => await splitMod.run(undefined, { mode: "every", n: 1 }, ctx),
+      (err) => {
+        assert.ok(err instanceof ToolError);
+        assert.match(err.message, /No PDF file provided to split/i);
+        return true;
+      }
+    );
+
+    await assert.rejects(
+      async () => await splitMod.run([{}], { mode: "every", n: 1 }, ctx),
+      (err) => {
+        assert.ok(err instanceof ToolError);
+        assert.match(err.message, /No PDF file provided to split/i);
+        return true;
+      }
+    );
+  });
+
+  await t.test("rejects empty PDF (0 pages) with actionable ToolError", async () => {
+    const emptyPdf = createZeroPagePdf();
+
+    await assert.rejects(
+      async () => await splitMod.run([{ name: "empty.pdf", data: emptyPdf }], { mode: "every", n: 1 }, ctx),
+      (err) => {
+        assert.ok(err instanceof ToolError);
+        assert.match(err.message, /The provided PDF has no pages/i);
+        return true;
+      }
+    );
+  });
 });
 
 test("mod-rotate", async (t) => {
@@ -524,6 +574,154 @@ test("mod-rotate", async (t) => {
     assert.equal(doc.getPage(0).getRotation().angle, 0);
     assert.equal(doc.getPage(1).getRotation().angle, 90);
     assert.equal(doc.getPage(2).getRotation().angle, 0);
+  });
+
+  await t.test("rejects missing, empty, or undefined input with actionable ToolError", async () => {
+    await assert.rejects(
+      async () => await rotateMod.run([], { degrees: 90 }, ctx),
+      (err) => {
+        assert.ok(err instanceof ToolError);
+        assert.match(err.message, /No PDF files provided to rotate/i);
+        return true;
+      }
+    );
+
+    await assert.rejects(
+      async () => await rotateMod.run(undefined, { degrees: 90 }, ctx),
+      (err) => {
+        assert.ok(err instanceof ToolError);
+        assert.match(err.message, /No PDF files provided to rotate/i);
+        return true;
+      }
+    );
+
+    await assert.rejects(
+      async () => await rotateMod.run([{}], { degrees: 90 }, ctx),
+      (err) => {
+        assert.ok(err instanceof ToolError);
+        assert.match(err.message, /No PDF file provided to rotate/i);
+        return true;
+      }
+    );
+  });
+
+  await t.test("rejects empty PDF (0 pages) with actionable ToolError", async () => {
+    const emptyPdf = createZeroPagePdf();
+
+    await assert.rejects(
+      async () => await rotateMod.run([{ name: "empty.pdf", data: emptyPdf }], { degrees: 90 }, ctx),
+      (err) => {
+        assert.ok(err instanceof ToolError);
+        assert.match(err.message, /The provided PDF has no pages/i);
+        return true;
+      }
+    );
+  });
+
+  await t.test("rejects non-standard or invalid rotation angles with ToolError", async () => {
+    await assert.rejects(
+      async () => await rotateMod.run([{ name: "doc.pdf", data: pdf }], { degrees: 45 }, ctx),
+      (err) => {
+        assert.ok(err instanceof ToolError);
+        assert.match(err.message, /Invalid rotation angle: "45"/i);
+        return true;
+      }
+    );
+
+    await assert.rejects(
+      async () => await rotateMod.run([{ name: "doc.pdf", data: pdf }], { degrees: -35 }, ctx),
+      (err) => {
+        assert.ok(err instanceof ToolError);
+        assert.match(err.message, /Invalid rotation angle: "-35"/i);
+        return true;
+      }
+    );
+
+    await assert.rejects(
+      async () => await rotateMod.run([{ name: "doc.pdf", data: pdf }], { degrees: "invalid" }, ctx),
+      (err) => {
+        assert.ok(err instanceof ToolError);
+        assert.match(err.message, /Invalid rotation angle: "invalid"/i);
+        return true;
+      }
+    );
+
+    await assert.rejects(
+      async () => await rotateMod.run([{ name: "doc.pdf", data: pdf }], { degrees: 90.5 }, ctx),
+      (err) => {
+        assert.ok(err instanceof ToolError);
+        assert.match(err.message, /Invalid rotation angle: "90.5"/i);
+        return true;
+      }
+    );
+  });
+
+  await t.test("accepts directional strings and negative multiples of 90 degrees", async () => {
+    const resNegative = await rotateMod.run(
+      [{ name: "doc.pdf", data: pdf }],
+      { degrees: -90, pages: "1" },
+      ctx
+    );
+    const docNeg = await PDFDocument.load(resNegative[0].data);
+    assert.equal(docNeg.getPage(0).getRotation().angle, 270);
+
+    const resClockwise = await rotateMod.run(
+      [{ name: "doc.pdf", data: pdf }],
+      { degrees: "clockwise", pages: "1" },
+      ctx
+    );
+    const docCw = await PDFDocument.load(resClockwise[0].data);
+    assert.equal(docCw.getPage(0).getRotation().angle, 90);
+
+    const resCounterCw = await rotateMod.run(
+      [{ name: "doc.pdf", data: pdf }],
+      { degrees: "counterclockwise", pages: "1" },
+      ctx
+    );
+    const docCcw = await PDFDocument.load(resCounterCw[0].data);
+    assert.equal(docCcw.getPage(0).getRotation().angle, 270);
+  });
+
+  await t.test("rejects invalid custom rotation rules instead of swallowing them", async () => {
+    // 1. Out-of-bounds page range
+    await assert.rejects(
+      async () => await rotateMod.run(
+        [{ name: "doc.pdf", data: pdf }],
+        { customRotations: [{ pages: "10-20", degrees: 90 }] },
+        ctx
+      ),
+      /10-20.*outside 1-3/i
+    );
+
+    // 2. Malformed page spec
+    await assert.rejects(
+      async () => await rotateMod.run(
+        [{ name: "doc.pdf", data: pdf }],
+        { customRotations: [{ pages: "abc", degrees: 90 }] },
+        ctx
+      ),
+      /Invalid page range/i
+    );
+
+    // 3. Empty page spec in rule
+    await assert.rejects(
+      async () => await rotateMod.run(
+        [{ name: "doc.pdf", data: pdf }],
+        { customRotations: [{ pages: "   ", degrees: 90 }] },
+        ctx
+      ),
+      /Custom rotation rule requires a valid 'pages' specification/i
+    );
+
+    // 4. Invalid angle in custom rule
+    await assert.rejects(
+      async () => await rotateMod.run(
+        [{ name: "doc.pdf", data: pdf }],
+        { customRotations: [{ pages: "1", degrees: 45 }] },
+        ctx
+      ),
+      /Invalid rotation angle: "45"/i
+    );
   });
 });
 

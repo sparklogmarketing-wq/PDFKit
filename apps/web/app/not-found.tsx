@@ -8,7 +8,7 @@ export default function NotFound() {
         Page Not Found
       </h2>
       <p style={{ maxWidth: "24rem", margin: "0 auto 2rem", color: "var(--text-muted)" }}>
-        The tool or page you requested doesn't exist or may have been moved.
+        The tool or page you requested doesn&apos;t exist or may have been moved.
       </p>
       <Link href="/" className="btn-primary">
         Back to All Tools

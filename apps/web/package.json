@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint"
   },
   "dependencies": {
     "@pdfkit/core": "*",
@@ -22,9 +23,10 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@types/jszip": "^3.4.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.0.0"
   }
 }

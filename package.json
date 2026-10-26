@@ -2,12 +2,13 @@
   "name": "pdfkit",
   "private": true,
   "workspaces": ["apps/*", "packages/*"],
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22.6.0" },
   "scripts": {
     "dev": "npm run dev -w apps/web",
     "build": "npm run build -w apps/web",
     "start": "npx serve apps/web/out",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
     "test": "node --experimental-strip-types scripts/test-modules.mjs && node --experimental-strip-types scripts/test-security.mjs",
     "new:module": "node scripts/new-module.mjs"
   },

@@ -1,14 +1,18 @@
 {
-    "name": "@pdfkit/mod-organize",
-    "version": "0.1.0",
-    "private": true,
-    "type": "module",
-    "exports": {
-        ".": "./src/index.ts",
-        "./manifest": "./src/manifest.ts"
-    },
-    "dependencies": {
-        "@pdfkit/core": "*",
-        "@cantoo/pdf-lib": "^2.3.0"
-    }
+  "name": "@pdfkit/mod-organize",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./manifest": "./src/manifest.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types ../../scripts/test-modules.mjs"
+  },
+  "dependencies": {
+    "@pdfkit/core": "*",
+    "@cantoo/pdf-lib": "^2.3.0"
+  }
 }

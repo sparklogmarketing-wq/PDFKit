@@ -33,26 +33,28 @@ function parseDegrees(val: string | number | undefined, defaultDeg = 90): number
   if (val === undefined || val === null || val === "") return defaultDeg;
   if (typeof val === "string") {
     const lower = val.trim().toLowerCase();
-    if (lower === "right") return 90;
-    if (lower === "left") return 270;
+    if (lower === "right" || lower === "clockwise") return 90;
+    if (lower === "left" || lower === "counterclockwise" || lower === "counter-clockwise") return 270;
   }
   const n = Number(val);
-  if (Number.isNaN(n)) return defaultDeg;
+  if (Number.isNaN(n) || !Number.isInteger(n) || n % 90 !== 0) {
+    throw new ToolError(
+      `Invalid rotation angle: "${val}". Rotation angle must be a multiple of 90 degrees (e.g. 0, 90, 180, 270).`
+    );
+  }
   return ((n % 360) + 360) % 360;
 }
 
 function buildCustomRulesMap(rules: readonly CustomRotationRule[], totalPages: number): Map<number, number> {
   const map = new Map<number, number>();
   for (const rule of rules) {
-    if (!rule.pages?.trim()) continue;
+    if (!rule || !rule.pages?.trim()) {
+      throw new ToolError("Custom rotation rule requires a valid 'pages' specification.");
+    }
     const ruleDelta = parseDegrees(rule.degrees, 0);
-    try {
-      const ruleIndices = parsePageSpec(rule.pages, totalPages);
-      for (const idx of ruleIndices) {
-        map.set(idx, ruleDelta);
-      }
-    } catch {
-      // If a custom range is invalid for this file, skip rule gracefully
+    const ruleIndices = parsePageSpec(rule.pages, totalPages);
+    for (const idx of ruleIndices) {
+      map.set(idx, ruleDelta);
     }
   }
   return map;
@@ -96,9 +98,15 @@ async function processPdfFile(
   ctx: RunContext
 ): Promise<OutputFile> {
   checkAborted(ctx.signal);
+  if (!file || !file.data) {
+    throw new ToolError("No PDF file provided to rotate");
+  }
   const doc = await PDFDocument.load(file.data);
   const pages = doc.getPages();
   const totalPages = pages.length;
+  if (totalPages === 0) {
+    throw new ToolError("The provided PDF has no pages.");
+  }
 
   const fileOverrides = opts.fileRotations?.[fIdx] ?? opts.fileRotations?.[file.name];
   const fileBaseDegrees = fileOverrides?.degrees !== undefined
@@ -128,7 +136,7 @@ async function processPdfFile(
     );
 
     if (delta !== 0) {
-      const cur = pages[i].getRotation().angle;
+      const cur = pages[i].getRotation()?.angle ?? 0;
       pages[i].setRotation(degrees(((cur + delta) % 360 + 360) % 360));
     }
 
@@ -137,7 +145,8 @@ async function processPdfFile(
 
   checkAborted(ctx.signal);
   const savedData = await doc.save();
-  const outputName = file.name.replace(/\.pdf$/i, "") + "-rotated.pdf";
+  const baseName = (file.name || "document").replace(/\.pdf$/i, "");
+  const outputName = `${baseName}-rotated.pdf`;
   return {
     name: outputName,
     mime: "application/pdf",
