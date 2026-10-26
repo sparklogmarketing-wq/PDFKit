@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { formatBytes } from "../apps/web/lib/formatBytes.ts";
 import { formatBytes as formatBytesReexport } from "../apps/web/lib/format.ts";
+import { deriveNavLinks, buildSearchTarget, SEARCH_DEBOUNCE_MS } from "../apps/web/lib/nav.ts";
+import { debounce } from "../apps/web/lib/debounce.ts";
+import { manifests } from "../apps/web/lib/registry.ts";
 
 test("Code hygiene, dead code removal, and deduplication (Issue #30)", async (t) => {
   await t.test("ThemeToggle dead component is removed", () => {
@@ -111,5 +114,114 @@ test("Duplicate CSS removal and inline styles consolidation (Issue #31)", async 
 
     // RemoveTool should have <= 15 inline styles (reduced from 50)
     assert.ok(checkInlineStyles("apps/web/components/RemoveTool.tsx") <= 15);
+  });
+});
+
+test("Derived navbar links and search debounce (Issue #33)", async (t) => {
+  await t.test("navbar links are derived dynamically from registry manifests", () => {
+    const links = deriveNavLinks();
+
+    // First link is always All Tools
+    assert.strictEqual(links[0].href, "/");
+    assert.strictEqual(links[0].label, "All Tools");
+
+    // Every active tool manifest must be present in navbar
+    const activeManifests = manifests.filter((m) => !m.status || m.status === "active");
+    assert.strictEqual(links.length, activeManifests.length + 1);
+
+    for (const manifest of activeManifests) {
+      const match = links.find((link) => link.href === `/tools/${manifest.id}`);
+      assert.ok(match, `Expected tool "${manifest.id}" to have a navbar link`);
+      assert.strictEqual(match.label, manifest.title);
+    }
+
+    // Specific check for Remove Pages which was previously missing
+    const removeLink = links.find((l) => l.href === "/tools/remove");
+    assert.ok(removeLink, "Navbar must include Remove Pages (/tools/remove)");
+    assert.strictEqual(removeLink.label, "Remove Pages");
+  });
+
+  await t.test("Navbar component does not contain hardcoded tool link array literals", () => {
+    const navbarContent = fs.readFileSync("apps/web/components/Navbar.tsx", "utf8");
+    assert.strictEqual(
+      navbarContent.includes('{ href: "/tools/merge"'),
+      false,
+      "Navbar.tsx must not contain hardcoded tool links"
+    );
+    assert.ok(
+      navbarContent.includes("deriveNavLinks"),
+      "Navbar.tsx must derive links using deriveNavLinks"
+    );
+  });
+
+  await t.test("buildSearchTarget correctly determines route actions and query params", () => {
+    // 1. On home page ("/"):
+    // Searching sets or updates ?q=
+    const homeSearch = buildSearchTarget("rotate", "/", new URLSearchParams());
+    assert.strictEqual(homeSearch.action, "replace");
+    assert.strictEqual(homeSearch.url, "/?q=rotate");
+
+    // Whitespace is trimmed
+    const trimmedSearch = buildSearchTarget("  split  ", "/", new URLSearchParams());
+    assert.strictEqual(trimmedSearch.action, "replace");
+    assert.strictEqual(trimmedSearch.url, "/?q=split");
+
+    // Clearing search on home page removes ?q
+    const clearHomeSearch = buildSearchTarget("", "/", new URLSearchParams("q=merge&foo=bar"));
+    assert.strictEqual(clearHomeSearch.action, "replace");
+    assert.strictEqual(clearHomeSearch.url, "/?foo=bar");
+
+    // If query is unchanged, no action is taken
+    const noOpHome = buildSearchTarget("merge", "/", new URLSearchParams("q=merge"));
+    assert.strictEqual(noOpHome.action, "none");
+
+    // 2. On subpages (e.g. "/tools/merge"):
+    // Entering query pushes navigation to home with query
+    const subpageSearch = buildSearchTarget("split", "/tools/merge", new URLSearchParams());
+    assert.strictEqual(subpageSearch.action, "push");
+    assert.strictEqual(subpageSearch.url, "/?q=split");
+
+    // Empty query on subpage takes no action (avoids navigating away accidentally)
+    const emptySubpage = buildSearchTarget("", "/tools/merge", new URLSearchParams());
+    assert.strictEqual(emptySubpage.action, "none");
+  });
+
+  await t.test("debounce utility coalesces rapid calls, respects delay, cancel, and flush", async () => {
+    let callCount = 0;
+    let lastValue = "";
+
+    const debouncedFn = debounce((val) => {
+      callCount++;
+      lastValue = val;
+    }, 50);
+
+    // Rapid successive invocations
+    debouncedFn("a");
+    debouncedFn("b");
+    debouncedFn("c");
+
+    // Should not have fired synchronously
+    assert.strictEqual(callCount, 0);
+
+    // Wait 25ms (less than 50ms)
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.strictEqual(callCount, 0);
+
+    // Wait another 35ms (total 60ms > 50ms)
+    await new Promise((resolve) => setTimeout(resolve, 35));
+    assert.strictEqual(callCount, 1);
+    assert.strictEqual(lastValue, "c");
+
+    // Test cancel
+    debouncedFn("d");
+    debouncedFn.cancel();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.strictEqual(callCount, 1, "Cancelled debounce must not fire");
+
+    // Test flush
+    debouncedFn("e");
+    debouncedFn.flush();
+    assert.strictEqual(callCount, 2);
+    assert.strictEqual(lastValue, "e");
   });
 });
