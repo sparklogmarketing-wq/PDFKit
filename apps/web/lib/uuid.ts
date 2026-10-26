@@ -30,13 +30,13 @@ export function generateUUID(): string {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     let r = Math.random() * 16;
     if (d > 0) {
-      r = (d + r) % 16 | 0;
+      r = Math.trunc((d + r) % 16);
       d = Math.floor(d / 16);
     } else if (d2 > 0) {
-      r = (d2 + r) % 16 | 0;
+      r = Math.trunc((d2 + r) % 16);
       d2 = Math.floor(d2 / 16);
     } else {
-      r = r | 0;
+      r = Math.trunc(r);
     }
     const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);

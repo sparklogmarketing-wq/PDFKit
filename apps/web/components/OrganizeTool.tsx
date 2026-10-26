@@ -935,13 +935,12 @@ export default function OrganizeTool() {
         </div>
 
         {memoryWarning && (
-          <div
-            role="status"
+          <output
             className="alert-warning"
             style={{ marginBottom: "1rem" }}
           >
             {memoryWarning}
-          </div>
+          </output>
         )}
 
         {error && (

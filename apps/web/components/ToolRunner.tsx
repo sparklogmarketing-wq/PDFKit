@@ -560,9 +560,9 @@ export default function ToolRunner({ manifest }: { manifest: ToolManifest }) {
         )}
 
         {memoryWarning && (
-          <div role="status" className="alert-warning" style={{ marginBottom: "1rem" }}>
+          <output className="alert-warning" style={{ marginBottom: "1rem" }}>
             {memoryWarning}
-          </div>
+          </output>
         )}
 
         {/* Error Alert */}

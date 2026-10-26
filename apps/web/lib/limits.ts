@@ -1,10 +1,7 @@
 import {
   type PayloadLimits,
-  DEFAULT_PAYLOAD_LIMITS,
   PayloadLimitError,
   validatePayloadLimits,
-  getPayloadMemoryWarning,
-  type FilePayloadInfo,
 } from "@pdfkit/core";
 
 export {
@@ -14,7 +11,7 @@ export {
   validatePayloadLimits,
   getPayloadMemoryWarning,
   type FilePayloadInfo,
-};
+} from "@pdfkit/core";
 
 export interface FileValidationResult {
   readonly valid: File[];

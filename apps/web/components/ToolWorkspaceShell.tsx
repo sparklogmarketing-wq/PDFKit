@@ -76,9 +76,9 @@ export default function ToolWorkspaceShell({
         />
 
         {warning && !error && (
-          <div className="alert-warning workspace-alert" role="status">
+          <output className="alert-warning workspace-alert">
             {warning}
-          </div>
+          </output>
         )}
 
         {error && (
@@ -117,9 +117,9 @@ export default function ToolWorkspaceShell({
       )}
 
       {warning && (
-        <div className="alert-warning workspace-alert-spaced" role="status">
+        <output className="alert-warning workspace-alert-spaced">
           {warning}
-        </div>
+        </output>
       )}
 
       {error && (

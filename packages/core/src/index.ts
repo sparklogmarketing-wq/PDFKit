@@ -89,6 +89,13 @@ export interface FilePayloadInfo {
   readonly data?: { readonly byteLength: number } | Uint8Array;
 }
 
+function getFilePayloadSize(f: FilePayloadInfo): number {
+  if (typeof f.size === "number") {
+    return f.size;
+  }
+  return f.data?.byteLength ?? 0;
+}
+
 function formatByteSize(bytes: number): string {
   if (bytes <= 0 || !Number.isFinite(bytes)) return "0 B";
   const k = 1024;
@@ -118,7 +125,7 @@ export function validatePayloadLimits(
 
   let totalSize = 0;
   for (const f of files) {
-    const size = typeof f.size === "number" ? f.size : (f.data ? f.data.byteLength : 0);
+    const size = getFilePayloadSize(f);
     if (size > limits.maxFileSizeBytes) {
       throw new PayloadLimitError(
         `File "${f.name}" (${formatByteSize(size)}) exceeds the maximum allowed size of ${formatByteSize(limits.maxFileSizeBytes)}.`,
@@ -152,7 +159,7 @@ export function getPayloadMemoryWarning(
   const limits = { ...DEFAULT_PAYLOAD_LIMITS, ...customLimits };
   let totalSize = 0;
   for (const f of files) {
-    const size = typeof f.size === "number" ? f.size : (f.data ? f.data.byteLength : 0);
+    const size = getFilePayloadSize(f);
     totalSize += size;
   }
 

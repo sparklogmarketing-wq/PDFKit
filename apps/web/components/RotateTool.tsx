@@ -1004,7 +1004,36 @@ export default function RotateTool() {
     });
   }
 
-  /* ── Process & Run Tool ──────────────────────────────────── */
+  function buildPerFileRotations(
+  files: readonly File[],
+  filePagesMap: Record<string, number>,
+  pageAngles: Record<string, number>,
+  isPageProtected: (page: number) => boolean
+): Record<number, { pageRotations: Record<number, number>; degrees: number }> {
+  let currentGlobalPage = 1;
+  const perFileRotations: Record<number, any> = {};
+
+  for (let fIdx = 0; fIdx < files.length; fIdx++) {
+    const f = files[fIdx];
+    const numPages = filePagesMap[f.name] || 1;
+    const pageRotMap: Record<number, number> = {};
+
+    for (let p = 1; p <= numPages; p++, currentGlobalPage++) {
+      const key = `${f.name}-${p}`;
+      const isProtected = isPageProtected(currentGlobalPage);
+      pageRotMap[p] = isProtected ? 0 : (pageAngles[key] ?? 0);
+    }
+
+    perFileRotations[fIdx] = {
+      pageRotations: pageRotMap,
+      degrees: 0,
+    };
+  }
+
+  return perFileRotations;
+}
+
+/* ── Process & Run Tool ──────────────────────────────────── */
   async function handleRotateSubmit() {
     if (files.length === 0 || isRunning) return;
     const runId = ++runIdRef.current;
@@ -1024,24 +1053,12 @@ export default function RotateTool() {
         if (runId !== runIdRef.current) return;
       }
 
-      let currentGlobalPage = 1;
-      const perFileRotations: Record<number, any> = {};
-      for (let fIdx = 0; fIdx < files.length; fIdx++) {
-        const f = files[fIdx];
-        const numPages = filePagesMap[f.name] || 1;
-        const pageRotMap: Record<number, number> = {};
-
-        for (let p = 1; p <= numPages; p++, currentGlobalPage++) {
-          const key = `${f.name}-${p}`;
-          const isProtected = isPageProtected(currentGlobalPage);
-          pageRotMap[p] = isProtected ? 0 : (pageAngles[key] ?? 0);
-        }
-
-        perFileRotations[fIdx] = {
-          pageRotations: pageRotMap,
-          degrees: 0,
-        };
-      }
+      const perFileRotations = buildPerFileRotations(
+        files,
+        filePagesMap,
+        pageAngles,
+        isPageProtected
+      );
 
       const toolOpts = {
         degrees: 0,

@@ -609,9 +609,9 @@ export default function ExtractTool() {
 
           {/* Mode switch */}
           <div className="split-submode-row">
-            <label className="split-field-label">
+            <span className="split-field-label">
               Extract mode:
-            </label>
+            </span>
             <div className="split-submode-tabs">
               <button
                 type="button"

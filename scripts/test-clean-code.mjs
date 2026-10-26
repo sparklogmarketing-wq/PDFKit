@@ -2,12 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { formatBytes } from "../apps/web/lib/formatBytes.ts";
-import { formatBytes as formatBytesReexport } from "../apps/web/lib/format.ts";
-import { deriveNavLinks, buildSearchTarget, SEARCH_DEBOUNCE_MS } from "../apps/web/lib/nav.ts";
+import { deriveNavLinks, buildSearchTarget } from "../apps/web/lib/nav.ts";
 import { debounce } from "../apps/web/lib/debounce.ts";
 import { uint8ArrayToBlob } from "../apps/web/lib/blob.ts";
 import { generateUUID } from "../apps/web/lib/uuid.ts";
-import { formatPageCount, clampMonotonicProgress } from "../apps/web/lib/format.ts";
+import {
+  formatBytes as formatBytesReexport,
+  formatPageCount,
+  clampMonotonicProgress,
+} from "../apps/web/lib/format.ts";
 import { resolveAssetUrl } from "../apps/web/lib/pdfjs.ts";
 import { manifests } from "../apps/web/lib/registry.ts";
 
@@ -328,7 +331,7 @@ test("Browser edge cases hardening (Issue #35)", async (t) => {
     // Unknown cases must never display as "1 page"
     assert.strictEqual(formatPageCount(null), "Unknown pages");
     assert.strictEqual(formatPageCount(undefined), "Unknown pages");
-    assert.strictEqual(formatPageCount(NaN), "Unknown pages");
+    assert.strictEqual(formatPageCount(Number.NaN), "Unknown pages");
     assert.strictEqual(formatPageCount(-1), "Unknown pages");
 
     // Known counts
@@ -339,13 +342,16 @@ test("Browser edge cases hardening (Issue #35)", async (t) => {
   });
 
   await t.test("clampMonotonicProgress ensures progress never decreases", () => {
-    assert.strictEqual(clampMonotonicProgress(null, 0.1), 0.1);
-    assert.strictEqual(clampMonotonicProgress(undefined, 0.2), 0.2);
-    assert.strictEqual(clampMonotonicProgress(0.2, 0.5), 0.5);
-    assert.strictEqual(clampMonotonicProgress(0.5, 0.3), 0.5, "Out of order smaller progress must be clamped");
-    assert.strictEqual(clampMonotonicProgress(0.5, 0.5), 0.5);
-    assert.strictEqual(clampMonotonicProgress(0.5, 0.9), 0.9);
-    assert.strictEqual(clampMonotonicProgress(0.9, 1.0), 1.0);
+    const assertClose = (actual, expected, message) => {
+      assert.ok(Math.abs(actual - expected) < 1e-6, message || `Expected ${actual} to equal ${expected}`);
+    };
+    assertClose(clampMonotonicProgress(null, 0.1), 0.1);
+    assertClose(clampMonotonicProgress(undefined, 0.2), 0.2);
+    assertClose(clampMonotonicProgress(0.2, 0.5), 0.5);
+    assertClose(clampMonotonicProgress(0.5, 0.3), 0.5, "Out of order smaller progress must be clamped");
+    assertClose(clampMonotonicProgress(0.5, 0.5), 0.5);
+    assertClose(clampMonotonicProgress(0.5, 0.9), 0.9);
+    assertClose(clampMonotonicProgress(0.9, 1.0), 1.0);
   });
 
   await t.test("window.open uses noopener,noreferrer", () => {
