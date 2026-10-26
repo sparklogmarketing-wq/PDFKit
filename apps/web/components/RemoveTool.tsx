@@ -5,7 +5,7 @@ import { renderPdfPage, getPdfInfo } from "../lib/pdfjs";
 import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { formatBytes } from "../lib/formatBytes";
-import { formatPagesToRangeString } from "../lib/format";
+import { formatPagesToRangeString, uint8ArrayToBlob } from "../lib/format";
 import { parsePageSpec } from "@pdfkit/core";
 import { validateFilesForUpload } from "../lib/limits";
 import PdfZoomModal from "./PdfZoomModal";
@@ -636,7 +636,7 @@ export default function RemoveTool() {
         },
         (p: number) => {
           if (runId === runIdRef.current) {
-            setProgress(p);
+            setProgress((prev) => (prev === null ? p : Math.max(prev, p)));
             setStatusMessage(`Removing pages... ${Math.round(p * 100)}%`);
           }
         }
@@ -647,7 +647,7 @@ export default function RemoveTool() {
       if (runId !== runIdRef.current || !file) return;
 
       const items = outputs.map((item) => {
-        const blob = new Blob([item.data as BlobPart], { type: item.mime || "application/pdf" });
+        const blob = uint8ArrayToBlob(item.data, item.mime);
         return {
           name: item.name,
           url: URL.createObjectURL(blob),

@@ -6,6 +6,7 @@ import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
+import { uint8ArrayToBlob } from "../lib/format";
 import { formatPageRanges, parsePageRanges } from "../lib/pageRanges";
 import { validateFilesForUpload } from "../lib/limits";
 import PdfZoomModal from "./PdfZoomModal";
@@ -292,7 +293,7 @@ export default function ExtractTool() {
           outputName: outputName.trim() || undefined,
         },
         (p) => {
-          if (runId === runIdRef.current) setProgress(p);
+          if (runId === runIdRef.current) setProgress((prev) => (prev === null ? p : Math.max(prev, p)));
         }
       );
 
@@ -302,7 +303,7 @@ export default function ExtractTool() {
 
       const outputFiles = outputs.map((out: OutputFile) => ({
         name: out.name,
-        url: URL.createObjectURL(new Blob([out.data.buffer as ArrayBuffer], { type: out.mime })),
+        url: URL.createObjectURL(uint8ArrayToBlob(out.data, out.mime)),
         size: out.data.byteLength,
       }));
 

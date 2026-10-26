@@ -6,6 +6,7 @@ import { validateFilesForUpload, getPayloadMemoryWarning } from "../lib/limits";
 import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { formatBytes } from "../lib/formatBytes";
+import { generateUUID, uint8ArrayToBlob } from "../lib/format";
 import PdfZoomModal from "./PdfZoomModal";
 import type { OutputFile } from "@pdfkit/core";
 import { reinsertBlanksAtRelativePositions } from "@pdfkit/mod-organize";
@@ -450,7 +451,7 @@ export default function OrganizeTool() {
         const theme = FILE_PALETTES[(files.length + i) % FILE_PALETTES.length];
         const info = fileInfos[i];
         const total = info?.numPages || 1;
-        const fileId = `f-${crypto.randomUUID()}`;
+        const fileId = `f-${generateUUID()}`;
 
         const entry: FileEntry = {
           id: fileId,
@@ -464,7 +465,7 @@ export default function OrganizeTool() {
         const currentFileIndex = files.length + i;
         for (let p = 0; p < total; p++) {
           newPagesList.push({
-            id: `p-${fileId}-${p}-${crypto.randomUUID()}`,
+            id: `p-${fileId}-${p}-${generateUUID()}`,
             fileId,
             fileIndex: currentFileIndex,
             pageIndex: p,
@@ -524,7 +525,7 @@ export default function OrganizeTool() {
 
   function handleInsertBlank(insertAt: number) {
     const blankItem: PageItem = {
-      id: `blank-${crypto.randomUUID()}`,
+      id: `blank-${generateUUID()}`,
       fileId: "blank",
       fileIndex: -1,
       pageIndex: -1,
@@ -787,7 +788,7 @@ export default function OrganizeTool() {
         { pages: pagesSpec, outputName },
         (p) => {
           if (runId === runIdRef.current) {
-            setProgress(Math.max(0.1, p));
+            setProgress((prev) => (prev === null ? Math.max(0.1, p) : Math.max(prev, p)));
             setStatusMsg(`Organizing PDF (${Math.round(p * 100)}%)…`);
           }
         }
@@ -799,7 +800,7 @@ export default function OrganizeTool() {
 
       const mapped = outputs.map((o) => ({
         name: o.name,
-        url: URL.createObjectURL(new Blob([o.data.buffer as ArrayBuffer], { type: o.mime })),
+        url: URL.createObjectURL(uint8ArrayToBlob(o.data, o.mime)),
         size: o.data.byteLength,
       }));
 

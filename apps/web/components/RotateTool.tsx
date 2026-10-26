@@ -6,7 +6,7 @@ import { usePdfThumbnail } from "../lib/usePdfThumbnail";
 import { runTool, isCancelledError } from "../lib/runTool";
 import { downloadFilesAsZip, useZipDownload } from "../lib/downloadZip";
 import { formatBytes } from "../lib/formatBytes";
-import { appendUniqueFiles } from "../lib/format";
+import { appendUniqueFiles, uint8ArrayToBlob } from "../lib/format";
 import { validateFilesForUpload, getPayloadMemoryWarning } from "../lib/limits";
 import PdfZoomModal from "./PdfZoomModal";
 import ToolResultsView from "./ToolResultsView";
@@ -1052,7 +1052,8 @@ export default function RotateTool() {
 
       const job = runTool("rotate", inputs, toolOpts, (p) => {
         if (runId === runIdRef.current) {
-          setProgress(Math.round(p * 100));
+          const nextP = Math.round(p * 100);
+          setProgress((prev) => (prev === null ? nextP : Math.max(prev, nextP)));
           setStatusMsg(`Processing pages... ${Math.round(p * 100)}%`);
         }
       });
@@ -1062,7 +1063,7 @@ export default function RotateTool() {
       if (runId !== runIdRef.current || files.length === 0) return;
 
       const res = outputs.map((out) => {
-        const blob = new Blob([out.data as BlobPart], { type: out.mime || "application/pdf" });
+        const blob = uint8ArrayToBlob(out.data, out.mime);
         return {
           name: out.name,
           url: URL.createObjectURL(blob),

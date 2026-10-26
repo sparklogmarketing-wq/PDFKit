@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { loadPdfPagesMap } from "../lib/pdfjs";
 import { runTool, isCancelledError } from "../lib/runTool";
-import { calculateTotalPages, filterPdfFiles, appendUniqueFiles } from "../lib/format";
+import { calculateTotalPages, filterPdfFiles, appendUniqueFiles, uint8ArrayToBlob } from "../lib/format";
 import { validateFilesForUpload, getPayloadMemoryWarning } from "../lib/limits";
 import PdfZoomModal from "./PdfZoomModal";
 import PdfThumbnailCard from "./PdfThumbnailCard";
@@ -457,7 +457,7 @@ export default function MergeTool() {
 
       const job = runTool("merge", inputs, {}, (p) => {
         if (runId === runIdRef.current) {
-          setProgress(p);
+          setProgress((prev) => (prev === null ? p : Math.max(prev, p)));
           setStatusMessage(`Merging documents... ${Math.round(p * 100)}%`);
         }
       });
@@ -469,7 +469,7 @@ export default function MergeTool() {
       const finalName = resolveMergedFileName(outputFileName);
 
       const res = outputs.map((out) => {
-        const blob = new Blob([out.data as BlobPart], { type: out.mime || "application/pdf" });
+        const blob = uint8ArrayToBlob(out.data, out.mime);
         return {
           name: finalName,
           url: URL.createObjectURL(blob),

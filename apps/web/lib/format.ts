@@ -1,9 +1,20 @@
 import { formatPageIndices, formatPageRanges } from "./pageRanges.ts";
 export { formatBytes } from "./formatBytes.ts";
+export { uint8ArrayToBlob } from "./blob.ts";
+export { generateUUID } from "./uuid.ts";
 
-export function formatPageCount(count: number | null): string {
-  if (count === null) return "1 page";
+export function formatPageCount(count: number | null | undefined): string {
+  if (count === null || count === undefined || !Number.isFinite(count) || count < 0) {
+    return "Unknown pages";
+  }
   return `${count} ${count === 1 ? "page" : "pages"}`;
+}
+
+export function clampMonotonicProgress(prev: number | null | undefined, next: number): number {
+  if (prev === null || prev === undefined || !Number.isFinite(prev)) {
+    return next;
+  }
+  return Math.max(prev, next);
 }
 
 export function calculateTotalPages(files: readonly File[], pagesMap: Record<string, number>): number {
