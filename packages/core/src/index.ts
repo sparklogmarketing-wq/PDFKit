@@ -7,8 +7,6 @@ export type FieldDef =
   | { key: string; label: string; type: "checkbox"; default?: boolean; help?: string }
   | { key: string; label: string; type: "select"; default?: string; options: { value: string; label: string }[]; help?: string };
 
-export type ToolStatus = "active" | "planned" | "beta";
-
 /** Lightweight, import-safe metadata. Must NOT import heavy libraries. */
 export interface ToolManifest {
   id: string;
@@ -19,7 +17,6 @@ export interface ToolManifest {
   accepts: string[];     // MIME types
   multiple: boolean;     // accepts several input files
   fields: FieldDef[];
-  status?: ToolStatus;
   related?: string[];
 }
 

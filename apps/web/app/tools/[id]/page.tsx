@@ -29,7 +29,6 @@ export default async function ToolPage({ params }: { readonly params: Promise<{ 
   if (!manifest) notFound();
 
   const categoryLabel = manifest.category;
-  const isActive = manifest.status === "active";
   const relatedTools = getRelatedTools(manifest, manifests);
 
   return (
@@ -50,12 +49,7 @@ export default async function ToolPage({ params }: { readonly params: Promise<{ 
               <ToolIcon id={manifest.id} size={26} />
             </div>
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <h1 className="tool-page-title" style={{ margin: 0 }}>{manifest.title}</h1>
-                <span className={`tool-badge ${isActive ? "active" : "planned"}`}>
-                  {isActive ? "Ready" : "Planned"}
-                </span>
-              </div>
+              <h1 className="tool-page-title" style={{ margin: 0 }}>{manifest.title}</h1>
               <p className="tool-page-desc" style={{ marginTop: "0.25rem" }}>{manifest.description}</p>
             </div>
           </div>
@@ -72,32 +66,24 @@ export default async function ToolPage({ params }: { readonly params: Promise<{ 
             Related Tools
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(16rem, 1fr))", gap: "1rem" }}>
-            {relatedTools.map((t) => {
-              const tIsActive = t.status === "active";
-              return (
-                <Link
-                  key={t.id}
-                  href={`/tools/${t.id}`}
-                  className="tool-card"
-                  style={{ padding: "1rem" }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <div style={{ color: "var(--primary)" }}>
-                        <ToolIcon id={t.id} size={24} />
-                      </div>
-                      <strong style={{ fontSize: "0.9375rem" }}>{t.title}</strong>
-                    </div>
-                    <span className={`tool-badge ${tIsActive ? "active" : "planned"}`}>
-                      {tIsActive ? "Ready" : "Planned"}
-                    </span>
+            {relatedTools.map((t) => (
+              <Link
+                key={t.id}
+                href={`/tools/${t.id}`}
+                className="tool-card"
+                style={{ padding: "1rem" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                  <div style={{ color: "var(--primary)" }}>
+                    <ToolIcon id={t.id} size={24} />
                   </div>
-                  <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
-                    {t.description}
-                  </p>
-                </Link>
-              );
-            })}
+                  <strong style={{ fontSize: "0.9375rem" }}>{t.title}</strong>
+                </div>
+                <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
+                  {t.description}
+                </p>
+              </Link>
+            ))}
           </div>
         </div>
       )}

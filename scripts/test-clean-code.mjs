@@ -129,11 +129,10 @@ test("Derived navbar links and search debounce (Issue #33)", async (t) => {
     assert.strictEqual(links[0].href, "/");
     assert.strictEqual(links[0].label, "All Tools");
 
-    // Every active tool manifest must be present in navbar
-    const activeManifests = manifests.filter((m) => !m.status || m.status === "active");
-    assert.strictEqual(links.length, activeManifests.length + 1);
+    // Every tool manifest must be present in navbar
+    assert.strictEqual(links.length, manifests.length + 1);
 
-    for (const manifest of activeManifests) {
+    for (const manifest of manifests) {
       const match = links.find((link) => link.href === `/tools/${manifest.id}`);
       assert.ok(match, `Expected tool "${manifest.id}" to have a navbar link`);
       assert.strictEqual(match.label, manifest.title);
@@ -399,5 +398,83 @@ test("Browser edge cases hardening (Issue #35)", async (t) => {
     // next.config.mjs supports subpath basePath
     const nextConfigCode = fs.readFileSync("apps/web/next.config.mjs", "utf8");
     assert.ok(nextConfigCode.includes("basePath"), "next.config.mjs must support dynamic basePath");
+  });
+});
+
+test("Documentation & Module Scaffold Workflow (Issue #36)", async (t) => {
+  await t.test("README.md documents all implemented tools and matches manifests", () => {
+    const readme = fs.readFileSync("README.md", "utf8");
+    for (const m of manifests) {
+      assert.ok(
+        readme.includes(`@pdfkit/mod-${m.id}`),
+        `README.md must document package @pdfkit/mod-${m.id}`
+      );
+      assert.ok(
+        readme.includes(m.title),
+        `README.md must document tool title "${m.title}"`
+      );
+    }
+    // Remove, Organize, and Extract specifically
+    assert.ok(readme.includes("@pdfkit/mod-remove"), "README documents Remove Pages");
+    assert.ok(readme.includes("@pdfkit/mod-organize"), "README documents Organize PDF");
+    assert.ok(readme.includes("@pdfkit/mod-extract"), "README documents Extract Pages");
+
+    // Organize is no longer listed in planned table
+    const plannedSection = readme.slice(readme.indexOf("## Planned Modules"));
+    assert.strictEqual(
+      plannedSection.includes("`organize` | Organize Pages"),
+      false,
+      "organize must not be listed as a planned module in README"
+    );
+  });
+
+  await t.test("docs/MODULES.md documents all implemented tools and contains no nonexistent packages", () => {
+    const doc = fs.readFileSync("docs/MODULES.md", "utf8");
+    for (const m of manifests) {
+      assert.ok(
+        doc.includes("`" + m.id + "`"),
+        `docs/MODULES.md must document tool id "${m.id}"`
+      );
+    }
+
+    // Must not reference phantom packages
+    assert.strictEqual(doc.includes("packages/pipelines"), false, "No phantom packages/pipelines in MODULES.md");
+    assert.strictEqual(doc.includes("packages/viewer"), false, "No phantom packages/viewer in MODULES.md");
+    assert.strictEqual(doc.includes("packages/providers"), false, "No phantom packages/providers in MODULES.md");
+  });
+
+  await t.test("scripts/new-module.mjs produces a clean minimal template and does not copy mod-rotate", () => {
+    const scaffoldCode = fs.readFileSync("scripts/new-module.mjs", "utf8");
+    assert.strictEqual(
+      scaffoldCode.includes('cpSync("packages/mod-rotate"'),
+      false,
+      "Scaffold must not copy mod-rotate wholesale"
+    );
+    assert.ok(scaffoldCode.includes("Contributor Checklist"), "Scaffold must output contributor checklist");
+    assert.ok(scaffoldCode.includes("apps/web/lib/registry.ts"), "Checklist mentions registry");
+    assert.ok(scaffoldCode.includes("next.config.mjs"), "Checklist mentions next.config");
+    assert.ok(scaffoldCode.includes("toolComponents.tsx"), "Checklist mentions toolComponents / ToolRunner");
+  });
+});
+
+test("Tool status feature completely removed from the project", async (t) => {
+  await t.test("ToolManifest interface does not have status field and ToolStatus is removed", () => {
+    const coreSource = fs.readFileSync("packages/core/src/index.ts", "utf8");
+    assert.strictEqual(coreSource.includes("ToolStatus"), false, "ToolStatus must be removed from core");
+    assert.strictEqual(coreSource.includes("status?:"), false, "status field must be removed from ToolManifest");
+  });
+
+  await t.test("No tool manifest defines a status property", () => {
+    for (const m of manifests) {
+      assert.strictEqual(m.status, undefined, `Tool "${m.id}" must not define a status property`);
+    }
+  });
+
+  await t.test("Tool page does not render tool status badges (Ready/Planned)", () => {
+    const pageSource = fs.readFileSync("apps/web/app/tools/[id]/page.tsx", "utf8");
+    assert.strictEqual(pageSource.includes("tool-badge"), false, "tool-badge must not be rendered on tool page");
+    assert.strictEqual(pageSource.includes("manifest.status"), false, "manifest.status must not be referenced");
+    assert.strictEqual(pageSource.includes('"Ready"'), false, '"Ready" status label must not appear');
+    assert.strictEqual(pageSource.includes('"Planned"'), false, '"Planned" status label must not appear');
   });
 });

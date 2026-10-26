@@ -27,7 +27,7 @@ Shared types and utilities. Every module depends only on this package.
 
 | Export | Description |
 |---|---|
-| `ToolManifest` | Metadata interface (id, title, category, fields, …) |
+| `ToolManifest` | Metadata interface (id, title, category, fields, related, …) |
 | `ToolModule<O>` | Contract: `run(inputs, opts, ctx) → OutputFile[]` |
 | `FieldDef` | Union type for form field definitions (text, number, select, checkbox) |
 | `OutputFile` | `{ name, mime, data: Uint8Array }` |
@@ -38,7 +38,7 @@ Shared types and utilities. Every module depends only on this package.
 
 ---
 
-## Modules
+## Implemented Modules
 
 Each module lives in `packages/mod-<id>` and exposes two entry points:
 
@@ -58,7 +58,7 @@ Combines several PDFs into one, in the order you choose.
 | Package | `@pdfkit/mod-merge` |
 | Accepts | `application/pdf` (multiple files) |
 | Options | none |
-| Output | `merged.pdf` |
+| Output | `merged.pdf` (or custom name) |
 | Library | `@cantoo/pdf-lib` |
 | Depends on | `@pdfkit/core` |
 
@@ -75,7 +75,7 @@ node --experimental-strip-types scripts/test-modules.mjs
 
 **Split PDF** · category: `organize` · backend: `client`
 
-Cuts a PDF into several files by page ranges or every N pages.
+Cuts a PDF into several files by page ranges, every N pages, or target byte size.
 
 | Detail | Value |
 |---|---|
@@ -88,7 +88,7 @@ Cuts a PDF into several files by page ranges or every N pages.
 
 > **Size mode & mergeAll constraints:** In `mode: "size"`, `maxSizeBytes` defaults to 500,000 bytes (shared between manifest and module). Individual pages that exceed `maxSizeBytes` are rejected with a `ToolError`. If `mergeAll: true` is requested alongside `mode: "size"`, the operation will throw a `ToolError` if merging the parts causes the resulting file to exceed `maxSizeBytes`.
 
-**Page range syntax** (shared with rotate via `parsePageSpec`):
+**Page range syntax** (shared across tools via `parsePageSpec`):
 
 | Spec | Meaning |
 |---|---|
@@ -112,13 +112,13 @@ node --experimental-strip-types scripts/test-modules.mjs
 
 **Rotate PDF** · category: `organize` · backend: `client`
 
-Rotates all pages or a subset of pages by a given angle.
+Rotates all pages or a subset of pages by a given angle (90°, 180°, or 270°).
 
 | Detail | Value |
 |---|---|
 | Package | `@pdfkit/mod-rotate` |
-| Accepts | `application/pdf` (single file) |
-| Options | `degrees` (`"90"` \| `"180"` \| `"270"`), `pages` (page range string, blank = all) |
+| Accepts | `application/pdf` (single file or multiple via UI) |
+| Options | `degrees` (`0` \| `90` \| `180` \| `270`), `pages` (page range string, blank = all), `fileRotations` (per-file page maps) |
 | Output | `<name>-rotated.pdf` |
 | Library | `@cantoo/pdf-lib` |
 | Depends on | `@pdfkit/core` |
@@ -127,6 +127,78 @@ Rotates all pages or a subset of pages by a given angle.
 
 ```bash
 npx tsc --noEmit -p packages/mod-rotate/tsconfig.json
+node --experimental-strip-types scripts/test-modules.mjs
+```
+
+---
+
+### `@pdfkit/mod-remove` — `packages/mod-remove`
+
+**Remove Pages** · category: `organize` · backend: `client`
+
+Removes specific pages from a PDF document by 0-based page index.
+
+| Detail | Value |
+|---|---|
+| Package | `@pdfkit/mod-remove` |
+| Accepts | `application/pdf` (single file) |
+| Options | `pageIndices` (array of zero-based numbers), `outputFileName` (optional string) |
+| Output | `<name>_removed.pdf` |
+| Library | `@cantoo/pdf-lib` |
+| Depends on | `@pdfkit/core` |
+
+**Build / run independently:**
+
+```bash
+npx tsc --noEmit -p packages/mod-remove/tsconfig.json
+node --experimental-strip-types scripts/test-modules.mjs
+```
+
+---
+
+### `@pdfkit/mod-organize` — `packages/mod-organize`
+
+**Organize PDF** · category: `organize` · backend: `client`
+
+Reorder, sort, delete, interleave pages, and insert blank pages across one or more documents.
+
+| Detail | Value |
+|---|---|
+| Package | `@pdfkit/mod-organize` |
+| Accepts | `application/pdf` (multiple files) |
+| Options | `pages` (array of `OrganizePageItem`), `outputName` (optional string) |
+| Output | `<name>_organized.pdf` |
+| Library | `@cantoo/pdf-lib` |
+| Depends on | `@pdfkit/core` |
+
+**Build / run independently:**
+
+```bash
+npx tsc --noEmit -p packages/mod-organize/tsconfig.json
+node --experimental-strip-types scripts/test-modules.mjs
+```
+
+---
+
+### `@pdfkit/mod-extract` — `packages/mod-extract`
+
+**Extract Pages** · category: `organize` · backend: `client`
+
+Extracts selected pages or all pages into individual files or a single merged PDF.
+
+| Detail | Value |
+|---|---|
+| Package | `@pdfkit/mod-extract` |
+| Accepts | `application/pdf` (single file) |
+| Options | `pages` (zero-based number array, blank = all), `mergeAll` (boolean), `outputName` (optional string) |
+| Output | `<name>-page<N>.pdf` or `<name>_extracted.pdf` |
+| Library | `@cantoo/pdf-lib` |
+| Depends on | `@pdfkit/core` |
+
+**Build / run independently:**
+
+```bash
+npx tsc --noEmit -p packages/mod-extract/tsconfig.json
 node --experimental-strip-types scripts/test-modules.mjs
 ```
 
@@ -149,7 +221,6 @@ All modules below run entirely in the browser via Web Workers — **zero server 
 
 | Module id | Title | Library | Key API | Inputs → Output |
 |---|---|---|---|---|
-| `organize` | Organize Pages | `@cantoo/pdf-lib` | `insertPage`, `removePage`, `copyPages` | 1 PDF → reordered PDF |
 | `page-numbers` | Add Page Numbers | `@cantoo/pdf-lib` | `page.drawText()` in loop | 1 PDF → numbered PDF |
 | `watermark` | Add Watermark | `@cantoo/pdf-lib` | `drawText()` / `drawImage()` per page | 1 PDF + optional image → watermarked PDF |
 
@@ -227,25 +298,39 @@ npm run new:module -- <id> "<Title>" <category>
 # e.g.: npm run new:module -- watermark "Add Watermark" edit
 ```
 
-Then register it in [`apps/web/lib/registry.ts`](apps/web/lib/registry.ts):
+This creates a clean, minimal package template in `packages/mod-<id>` with typed entry points and manifest.
 
-```ts
-// 1. Import the manifest
-import { manifest as watermark } from "@pdfkit/mod-watermark/manifest";
+### Contributor Integration Checklist:
 
-// 2. Add to the manifests array
-export const manifests: ToolManifest[] = [merge, split, rotate, watermark];
+1. **Workspace Dependencies:**
+   - In [`apps/web/package.json`](apps/web/package.json), add `"@pdfkit/mod-<id>": "*"` to `dependencies`.
+   - In [`apps/web/next.config.mjs`](apps/web/next.config.mjs), add `"@pdfkit/mod-<id>"` to `transpilePackages`.
 
-// 3. Add the lazy loader
-export const loaders = {
-  ...
-  watermark: () => import("@pdfkit/mod-watermark"),
-};
-```
+2. **Registry Wiring:**
+   - In [`apps/web/lib/registry.ts`](apps/web/lib/registry.ts):
+     ```ts
+     import { manifest as myTool } from "@pdfkit/mod-<id>/manifest";
+     export const manifests: ToolManifest[] = [..., myTool];
+     export const loaders = {
+       ...
+       [myTool.id]: () => import("@pdfkit/mod-<id>"),
+     };
+     ```
 
-Also update:
-- [`apps/web/package.json`](apps/web/package.json) — add the package as a dependency (`"@pdfkit/mod-watermark": "*"`)
-- [`apps/web/next.config.mjs`](apps/web/next.config.mjs) — add to `transpilePackages`
+3. **Navigation & Routes:**
+   - Navigation links in [`apps/web/components/Navbar.tsx`](apps/web/components/Navbar.tsx) automatically derive all active tools from `registry.ts`.
+   - The route `/tools/<id>` resolves automatically.
+
+4. **Tool UI:**
+   - Unmapped tools render the generic `ToolRunner` component automatically using field definitions from `manifest.ts`.
+   - For custom interactive workflows (such as canvas manipulation, reordering, or zoom preview), register a dedicated component in [`apps/web/lib/toolComponents.tsx`](apps/web/lib/toolComponents.tsx).
+
+5. **Testing:**
+   - Add unit tests for the module's execution and error handling in [`scripts/test-modules.mjs`](scripts/test-modules.mjs).
+   - Validate with `npm run typecheck && npm test`.
+
+6. **Documentation:**
+   - Add the tool and its options to [`README.md`](README.md) and [`docs/MODULES.md`](docs/MODULES.md).
 
 ---
 

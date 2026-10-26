@@ -1,33 +1,81 @@
 # Module specification
 
 Every module is a package `packages/mod-<id>` that exports:
-- `@pdfkit/mod-<id>/manifest`: light metadata (no heavy imports)
+- `@pdfkit/mod-<id>/manifest`: light metadata (id, title, category, fields, related)
 - `@pdfkit/mod-<id>` (default): a `ToolModule` with `run(inputs, opts, ctx)`
 
-**Rules:** depend only on `@pdfkit/core` + one library; never import another module; `run` is pure (bytes in, bytes out); honor `ctx.signal` and report `ctx.onProgress`; ship its own tests and fixtures. Chaining happens only in `packages/pipelines`.
-Add a module: `npm run new:module -- <id> "<Title>" <category>`, then register it in `apps/web/lib/registry.ts`.
+**Rules:**
+- Depend only on `@pdfkit/core` and relevant manipulation libraries (e.g. `@cantoo/pdf-lib`).
+- Modules are decoupled: never import another module directly.
+- `run()` is pure: bytes in (`InputFile[]`), options in (`opts`), and bytes out (`OutputFile[]`).
+- Honor cancellation: call `checkAborted(ctx?.signal)` before and during expensive processing.
+- Report progress: update `ctx?.onProgress?.(fraction)` monotonically (0.0 to 1.0).
+- Validate upfront: reject oversized inputs, invalid ranges, or out-of-bound indices with descriptive `ToolError` instances.
+- Provide comprehensive test coverage in `scripts/test-modules.mjs`.
 
-| Phase | Module | Backend | Library | Depends on |
-|---|---|---|---|---|
-| 1 | merge, split, rotate (done) | client | @cantoo/pdf-lib | core |
-| 1 | organize | client | pdf-lib + pdfjs-dist (thumbnails) | core, viewer |
-| 1 | page-numbers, watermark, metadata, attachments, img-to-pdf | client | pdf-lib | core |
-| 1 | edit (overlay), forms (create/fill/flatten) | client | pdf-lib (+pdfjs UI) | core, viewer |
-| 2 | pdf-to-img | client | pdfjs-dist | core |
-| 2 | compress | client | pdfjs-dist + pdf-lib (qpdf-wasm later) | core |
-| 2 | compare | client | pdfjs-dist + pixelmatch | core |
-| 2 | repair | client | pdf-lib tolerant load | core |
-| 3 | protect, unlock | client | @cantoo/pdf-lib AES-256 | core |
-| 3 | sign-visual | client | pdf-lib | core |
-| 3 | sign-digital, verify-signature | hybrid | @signpdf (client) / pyHanko service | core, SignProvider |
-| 4 | ocr-text, ocr-searchable-pdf | hybrid | Tesseract.js or ocr-svc (Unlimited-OCR) | core, OcrProvider |
-| 4 | extract-tables, extract-formulas | server | Unlimited-OCR | core, OcrProvider |
-| 5 | office-to-pdf, pdf-to-office | server | libreoffice-convert | core, ConvertProvider |
-| 6 | pipelines/* | mixed | compositions | any modules |
+## Active & Implemented Modules
 
-Shared (non-tool) packages to add next: `packages/viewer` (pdfjs React viewer), `packages/providers` (Ocr/Convert/Sign interfaces + HTTP clients), `services/*` (Docker).
+| Module ID | Title | Category | Backend | Library | Depends On | Status |
+|---|---|---|---|---|---|---|
+| `merge` | Merge PDF | organize | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
+| `split` | Split PDF | organize | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
+| `rotate` | Rotate PDF | organize | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
+| `remove` | Remove Pages | organize | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
+| `organize` | Organize PDF | organize | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
+| `extract` | Extract Pages | organize | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
 
-## Module Specific Notes
+## Planned Modules (Future Roadmap)
+
+| Module ID | Title | Category | Library / Stack | Backend | Notes |
+|---|---|---|---|---|---|
+| `page-numbers` | Add Page Numbers | organize | `@cantoo/pdf-lib` | client | `page.drawText()` in loop |
+| `watermark` | Add Watermark | edit | `@cantoo/pdf-lib` | client | `drawText()` / `drawImage()` per page |
+| `edit` | Edit PDF (Overlay) | edit | `@cantoo/pdf-lib` | client | Text and shape annotations |
+| `forms-fill` | Fill Form | edit | `@cantoo/pdf-lib` | client | `getForm()`, `getTextField()` |
+| `forms-create` | Create Form | edit | `@cantoo/pdf-lib` | client | Interactive form fields |
+| `forms-flatten` | Flatten Form | edit | `@cantoo/pdf-lib` | client | `getForm().flatten()` |
+| `metadata` | Edit Metadata | edit | `@cantoo/pdf-lib` | client | `setTitle()`, `setAuthor()` |
+| `img-to-pdf` | Image to PDF | convert | `@cantoo/pdf-lib` | client | Embed JPG/PNG images |
+| `pdf-to-img` | PDF to Images | convert | `pdfjs-dist` | client | Render pages to PNG canvas |
+| `compress` | Compress PDF | utility | `pdfjs-dist` + `@cantoo/pdf-lib` | client | Downscale image resolution |
+| `compare` | Compare PDFs | utility | `pdfjs-dist` + `pixelmatch` | client | Visual pixel diffing |
+| `repair` | Repair PDF | utility | `@cantoo/pdf-lib` | client | Tolerant object parsing |
+| `protect` | Protect PDF | security | `@cantoo/pdf-lib` | client | AES-256 encryption |
+| `unlock` | Unlock PDF | security | `@cantoo/pdf-lib` | client | Decrypt with password |
+| `ocr-text` | Extract Text (OCR) | ocr | `tesseract.js` | client | WASM OCR extraction |
+
+## Contributor Checklist: Adding a Module
+
+Scaffold a clean template:
+```bash
+npm run new:module -- <id> "<Title>" <category>
+# e.g.: npm run new:module -- watermark "Add Watermark" edit
+```
+
+Then complete the integration:
+1. **Workspace Dependencies**:
+   - In [`apps/web/package.json`](../apps/web/package.json), add `"@pdfkit/mod-<id>": "*"` to `dependencies`.
+   - In [`apps/web/next.config.mjs`](../apps/web/next.config.mjs), add `"@pdfkit/mod-<id>"` to `transpilePackages`.
+2. **Registry Wiring**:
+   - In [`apps/web/lib/registry.ts`](../apps/web/lib/registry.ts), import the manifest and register the lazy loader:
+     ```ts
+     import { manifest as myTool } from "@pdfkit/mod-<id>/manifest";
+     export const manifests: ToolManifest[] = [..., myTool];
+     export const loaders = { ..., [myTool.id]: () => import("@pdfkit/mod-<id>") };
+     ```
+3. **Navigation & Routes**:
+   - Navigation links are derived dynamically from `apps/web/lib/registry.ts`.
+   - The route `/tools/<id>` will automatically resolve the tool.
+4. **Tool UI**:
+   - By default, unmapped tools render the generic `ToolRunner` component.
+   - For custom interactive workflows (such as canvas manipulation or drag-and-drop), create a dedicated component in `apps/web/components/` and register it in `apps/web/lib/toolComponents.tsx`.
+5. **Testing**:
+   - Add module execution, validation, and error test suites in `scripts/test-modules.mjs`.
+   - Run typecheck and test suites: `npm run typecheck && npm test`.
+6. **Documentation**:
+   - Add the tool entry and its supported options to `README.md` and `docs/MODULES.md`.
+
+## Module-Specific Notes
 
 ### Split Module (`packages/mod-split`)
 - **Default Size**: `DEFAULT_MAX_SIZE_BYTES = 500000` (500 KB) is shared identically across both `manifest.ts` and module execution (`index.ts`).
@@ -43,7 +91,10 @@ Shared (non-tool) packages to add next: `packages/viewer` (pdfjs React viewer), 
 - **Strict Page Index Validation**: When providing `opts.pageIndices`, every element must be an integer within `[0, total - 1]`. Any out-of-range, negative, non-integer, or non-numeric index immediately rejects the request with an actionable `ToolError`.
 - **Atomic Operations**: No silent filtering or partial page removals occur. Deduplication happens only after every index passes validation.
 
-
+### Extract Module (`packages/mod-extract`)
+- **Configurable Extraction**: Supports selective extraction via zero-based page indices (`opts.pages`) or extracting all pages into separate single-page documents.
+- **Combined Output**: When `opts.mergeAll: true` is set, extracted pages are combined into a single continuous PDF document (`outputName` or `<name>_extracted.pdf`).
+- **Input Verification**: Validates that page indices exist within `[0, total - 1]` and prevents empty extractions.
 
 ## Payload & Memory Limits (Web & Core)
 

@@ -17,6 +17,5 @@ export const manifest: ToolManifest = {
       placeholder: '[{"fileIndex":0,"pageIndex":0,"rotation":0}]',
     },
   ],
-  status: "active",
   related: ["merge", "rotate", "remove"],
 };

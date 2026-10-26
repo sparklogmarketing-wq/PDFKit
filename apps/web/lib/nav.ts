@@ -14,12 +14,10 @@ export interface NavLinkItem {
 export function deriveNavLinks(toolManifests: ToolManifest[] = manifests): NavLinkItem[] {
   return [
     { href: "/", label: "All Tools" },
-    ...toolManifests
-      .filter((m) => !m.status || m.status === "active")
-      .map((m) => ({
-        href: `/tools/${m.id}`,
-        label: m.title,
-      })),
+    ...toolManifests.map((m) => ({
+      href: `/tools/${m.id}`,
+      label: m.title,
+    })),
   ];
 }
 

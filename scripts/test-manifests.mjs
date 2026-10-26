@@ -11,7 +11,6 @@ test("Tool Manifests Schema and Status Validation", async (t) => {
 
     const validCategories = new Set(["organize", "edit", "convert", "security", "ocr"]);
     const validBackends = new Set(["client", "server", "hybrid"]);
-    const validStatuses = new Set(["active", "planned", "beta"]);
 
     for (const m of manifests) {
       assert.ok(m.id && typeof m.id === "string", `Tool missing valid id: ${JSON.stringify(m)}`);
@@ -19,8 +18,7 @@ test("Tool Manifests Schema and Status Validation", async (t) => {
       assert.ok(m.description && typeof m.description === "string", `Tool ${m.id} missing description`);
       assert.ok(validCategories.has(m.category), `Tool ${m.id} has invalid category ${m.category}`);
       assert.ok(validBackends.has(m.backend), `Tool ${m.id} has invalid backend ${m.backend}`);
-      assert.ok(validStatuses.has(m.status ?? "planned"), `Tool ${m.id} has invalid status ${m.status}`);
-      assert.strictEqual(m.status, "active", `Expected implemented tool ${m.id} to have status="active"`);
+      assert.strictEqual(m.status, undefined, `Tool ${m.id} should not define status property; every tool is ready`);
       assert.ok(Array.isArray(m.accepts) && m.accepts.length > 0, `Tool ${m.id} missing accepts`);
       assert.strictEqual(typeof m.multiple, "boolean", `Tool ${m.id} missing multiple flag`);
       assert.ok(Array.isArray(m.fields), `Tool ${m.id} fields must be an array`);
