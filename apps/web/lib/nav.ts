@@ -69,6 +69,8 @@ export interface NavGroupItem {
   label: string;
   /** Route path. null = coming soon (not yet active). */
   href: string | null;
+  /** Optional icon identifier for rendering category-themed icons */
+  iconId?: string;
 }
 
 export interface NavGroup {
@@ -85,67 +87,69 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Organize PDF",
     items: [
-      { label: "Merge PDF",     href: "/tools/merge" },
-      { label: "Split PDF",     href: "/tools/split" },
-      { label: "Remove Pages",  href: "/tools/remove" },
-      { label: "Extract Pages", href: "/tools/extract" },
-      { label: "Organize PDF",  href: "/tools/organize" },
-      { label: "Scan to PDF",   href: null },
+      { label: "Merge PDF",     href: "/tools/merge",    iconId: "merge" },
+      { label: "Split PDF",     href: "/tools/split",    iconId: "split" },
+      { label: "Remove Pages",  href: "/tools/remove",   iconId: "remove" },
+      { label: "Extract Pages", href: "/tools/extract",  iconId: "extract" },
+      { label: "Organize PDF",  href: "/tools/organize", iconId: "organize" },
+      { label: "Scan to PDF",   href: null,              iconId: "scan" },
     ],
   },
   {
     label: "Optimize PDF",
     items: [
-      { label: "Compress PDF",  href: null },
-      { label: "Repair PDF",    href: null },
-      { label: "OCR PDF",       href: null },
+      { label: "Compress PDF",  href: null, iconId: "compress" },
+      { label: "Repair PDF",    href: null, iconId: "repair" },
+      { label: "OCR PDF",       href: null, iconId: "ocr" },
     ],
   },
   {
     label: "Convert to PDF",
     items: [
-      { label: "JPG to PDF",        href: null },
-      { label: "Word to PDF",       href: null },
-      { label: "PowerPoint to PDF", href: null },
-      { label: "Excel to PDF",      href: null },
-      { label: "HTML to PDF",       href: null },
+      { label: "JPG to PDF",        href: null, iconId: "jpg-to-pdf" },
+      { label: "Word to PDF",       href: null, iconId: "word-to-pdf" },
+      { label: "PowerPoint to PDF", href: null, iconId: "powerpoint-to-pdf" },
+      { label: "Excel to PDF",      href: null, iconId: "excel-to-pdf" },
+      { label: "HTML to PDF",       href: null, iconId: "html-to-pdf" },
     ],
   },
   {
     label: "Convert from PDF",
     items: [
-      { label: "PDF to JPG",        href: null },
-      { label: "PDF to Word",       href: null },
-      { label: "PDF to PowerPoint", href: null },
-      { label: "PDF to Excel",      href: null },
-      { label: "PDF to PDF/A",      href: null },
+      { label: "PDF to JPG",        href: null, iconId: "pdf-to-jpg" },
+      { label: "PDF to Word",       href: null, iconId: "pdf-to-word" },
+      { label: "PDF to PowerPoint", href: null, iconId: "pdf-to-powerpoint" },
+      { label: "PDF to Excel",      href: null, iconId: "pdf-to-excel" },
+      { label: "PDF to PDF/A",      href: null, iconId: "pdf-to-pdfa" },
     ],
   },
   {
     label: "Edit PDF",
     items: [
-      { label: "Rotate PDF",       href: "/tools/rotate" },
-      { label: "Add Page Numbers", href: null },
-      { label: "Add Watermark",    href: null },
-      { label: "Crop PDF",         href: null },
+      { label: "Rotate PDF",       href: "/tools/rotate", iconId: "rotate" },
+      { label: "Add Page Numbers", href: null,            iconId: "page-numbers" },
+      { label: "Add Watermark",    href: null,            iconId: "watermark" },
+      { label: "Crop PDF",         href: null,            iconId: "crop" },
+      { label: "Edit PDF",         href: null,            iconId: "edit" },
+      { label: "PDF Forms",        href: null,            iconId: "forms" },
     ],
   },
   {
     label: "PDF Security",
     items: [
-      { label: "Unlock PDF",   href: null },
-      { label: "Protect PDF",  href: null },
-      { label: "Sign PDF",     href: null },
-      { label: "Redact PDF",   href: null },
-      { label: "Compare PDF",  href: null },
+      { label: "Unlock PDF",   href: null, iconId: "unlock" },
+      { label: "Protect PDF",  href: null, iconId: "protect" },
+      { label: "Sign PDF",     href: null, iconId: "sign" },
+      { label: "Redact PDF",   href: null, iconId: "redact" },
+      { label: "Compare PDF",  href: null, iconId: "compare" },
     ],
   },
   {
     label: "PDF Intelligence",
     items: [
-      { label: "AI Summarizer",   href: null },
-      { label: "Translate PDF",   href: null },
-      { label: "PDF to Markdown", href: null },
+      { label: "AI Summarizer",   href: null, iconId: "ai-summarizer" },
+      { label: "Translate PDF",   href: null, iconId: "translate" },
+      { label: "PDF to Markdown", href: null, iconId: "pdf-to-markdown" },
     ],
   },
 ];

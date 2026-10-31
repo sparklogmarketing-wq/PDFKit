@@ -210,6 +210,10 @@ a {
   position: relative;
 }
 
+.nav-group-wrapper--megamenu {
+  position: static;
+}
+
 .nav-group-trigger {
   display: inline-flex;
   align-items: center;
@@ -218,8 +222,10 @@ a {
   border: none;
   background: transparent;
   border-radius: var(--radius-full);
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
@@ -237,7 +243,7 @@ a {
 .nav-group-trigger--active {
   background-color: var(--primary-subtle);
   color: var(--primary);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .nav-group-chevron {
@@ -249,27 +255,51 @@ a {
   transform: rotate(180deg);
 }
 
+/* Base dropdown panel */
 .nav-dropdown {
   position: absolute;
-  top: calc(100% + 6px);
+  top: 100%;
   left: 0;
-  min-width: 180px;
-  background: #fff;
-  border: 1.5px solid var(--border-light);
+  min-width: 200px;
+  background: #ffffff;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 32px rgba(124, 58, 237, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
-  padding: 0.375rem;
+  box-shadow: 0 16px 36px -6px rgba(124, 58, 237, 0.16), 0 4px 12px rgba(0, 0, 0, 0.06);
+  padding: 0.5rem;
   z-index: 200;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  animation: dropdown-in 0.13s ease;
+  gap: 2px;
+  animation: dropdown-in 0.14s ease;
+}
+
+/* Invisible bridge so mouse hover doesn't close on the gap */
+.nav-dropdown::before,
+.nav-megamenu-panel::before {
+  content: "";
+  position: absolute;
+  top: -16px;
+  left: 0;
+  right: 0;
+  height: 16px;
+  background: transparent;
+}
+
+/* 2-Column layout for Convert PDF dropdown */
+.nav-dropdown--columns {
+  display: flex;
+  flex-direction: row;
+  gap: 1.5rem;
+  padding: 1rem 1.25rem;
+  min-width: 440px;
+  right: 0;
+  left: auto;
 }
 
 @keyframes dropdown-in {
   from {
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateY(-4px);
   }
   to {
     opacity: 1;
@@ -280,16 +310,29 @@ a {
 .nav-dropdown-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.45rem 0.75rem;
+  gap: 0.625rem;
+  padding: 0.4rem 0.625rem;
   border-radius: var(--radius-md);
-  font-size: 0.875rem;
-  font-weight: 450;
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--text-main);
   text-decoration: none;
   transition: background var(--transition-fast), color var(--transition-fast);
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.nav-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.nav-item-label {
+  flex: 1;
   white-space: nowrap;
 }
 
@@ -307,12 +350,11 @@ a {
 .nav-dropdown-item--planned {
   color: var(--text-muted);
   cursor: default;
-  font-weight: 400;
 }
 
 .nav-dropdown-item--planned:hover {
-  background-color: transparent;
-  color: var(--text-muted);
+  background-color: var(--primary-subtle);
+  color: var(--text-main);
 }
 
 /* "Soon" badge — contrast-safe: #4c3d6e on #ede9fe = 5.1:1 */
@@ -323,11 +365,13 @@ a {
   background: #ede9fe;
   color: #4c3d6e;
   border-radius: var(--radius-full);
-  font-size: 0.7rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   flex-shrink: 0;
+  margin-left: 0.5rem;
 }
+
 /* Bold nav links (Merge, Split, Compress) */
 .nav-link--bold {
   font-weight: 700;
@@ -351,47 +395,84 @@ a {
 .nav-dropdown-section {
   display: flex;
   flex-direction: column;
-}
-
-.nav-dropdown-section + .nav-dropdown-section {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border-light);
+  gap: 2px;
 }
 
 .nav-dropdown-section-label {
   display: block;
-  padding: 0.2rem 0.75rem 0.25rem;
-  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem 0.4rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 0.35rem;
 }
 
-/* Mega-menu: wide multi-column panel anchored to the right */
-.nav-megamenu {
+/* ==========================================================================
+   Full-Width Multi-Column Mega-Menu ("All PDF Tools")
+   ========================================================================== */
+
+.nav-megamenu-panel {
   position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
-  gap: 0.5rem 1.25rem;
-  background: #fff;
-  border: 1.5px solid var(--border-light);
+  top: 100%;
+  left: 1.5rem;
+  right: 1.5rem;
+  background: #ffffff;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  box-shadow: 0 12px 40px rgba(124, 58, 237, 0.13), 0 2px 8px rgba(0, 0, 0, 0.06);
-  padding: 1rem;
+  box-shadow: 0 24px 48px -12px rgba(124, 58, 237, 0.18), 0 4px 16px rgba(0, 0, 0, 0.06);
+  padding: 1.5rem 1.75rem 1.25rem;
   z-index: 200;
-  min-width: 700px;
-  animation: dropdown-in 0.13s ease;
+  display: flex;
+  flex-direction: column;
+  animation: dropdown-in 0.14s ease;
 }
 
-/* Stack last group (PDF Intelligence) below row 1 — it lives alone */
+/* 6-Column Grid for Top Categories */
+.nav-megamenu-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1.5rem;
+}
+
 .nav-megamenu-col {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  min-width: 0;
+}
+
+.nav-megamenu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Bottom Category: PDF Intelligence */
+.nav-megamenu-bottom {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-light);
+}
+
+.nav-megamenu-col--bottom {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-megamenu-list--row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+}
+
+@media (max-width: 1080px) {
+  .nav-megamenu-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
 }
 
 /* Nav search bar */

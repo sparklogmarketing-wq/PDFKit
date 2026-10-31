@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -14,7 +14,9 @@ import {
   SEARCH_DEBOUNCE_MS,
   NAV_GROUPS,
   type NavGroup,
+  type NavGroupItem,
 } from "../lib/nav";
+import { NavToolIcon } from "./NavToolIcon";
 
 // ---------------------------------------------------------------------------
 // Search bar
@@ -96,6 +98,52 @@ function NavSearch() {
 }
 
 // ---------------------------------------------------------------------------
+// Single MenuItem helper
+// ---------------------------------------------------------------------------
+
+interface ToolMenuItemProps {
+  item: NavGroupItem;
+  currentPath: string;
+  onSelect: () => void;
+}
+
+function ToolMenuItem({ item, currentPath, onSelect }: ToolMenuItemProps) {
+  const isItemActive = item.href !== null && currentPath.startsWith(item.href);
+
+  if (item.href === null) {
+    return (
+      <span
+        className="nav-dropdown-item nav-dropdown-item--planned"
+        role="menuitem"
+        aria-disabled="true"
+      >
+        <span className="nav-item-icon">
+          <NavToolIcon iconId={item.iconId} size={18} />
+        </span>
+        <span className="nav-item-label">{item.label}</span>
+        <span className="nav-coming-badge" aria-label="Coming soon">
+          Soon
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={item.href}
+      className={`nav-dropdown-item${isItemActive ? " nav-dropdown-item--active" : ""}`}
+      role="menuitem"
+      onClick={onSelect}
+    >
+      <span className="nav-item-icon">
+        <NavToolIcon iconId={item.iconId} size={18} />
+      </span>
+      <span className="nav-item-label">{item.label}</span>
+    </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Generic single-group dropdown (used for "Convert PDF")
 // ---------------------------------------------------------------------------
 
@@ -108,28 +156,59 @@ interface GroupDropdownProps {
 function GroupDropdown({ label, groups, currentPath }: GroupDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isActive = groups.some((g) =>
     g.items.some((item) => item.href !== null && currentPath.startsWith(item.href))
   );
 
-  const handleMouseEnter = useCallback(() => setOpen(true), []);
-  const handleMouseLeave = useCallback(() => setOpen(false), []);
-  const handleToggle = useCallback(() => setOpen((v) => !v), []);
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Escape") setOpen(false);
+  const handleMouseEnter = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    setOpen(true);
   }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    timeoutRef.current = setTimeout(() => {
+      setOpen(false);
+    }, 220);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    setOpen(false);
+  }, []);
+
+  const handleToggle = useCallback(() => setOpen((v) => !v), []);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Escape") handleClose();
+    },
+    [handleClose]
+  );
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
+        handleClose();
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, [open, handleClose]);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   return (
     <div
@@ -164,40 +243,18 @@ function GroupDropdown({ label, groups, currentPath }: GroupDropdownProps) {
       </button>
 
       {open && (
-        <div className="nav-dropdown" role="menu">
+        <div className="nav-dropdown nav-dropdown--columns" role="menu">
           {groups.map((group) => (
             <div key={group.label} className="nav-dropdown-section">
               <span className="nav-dropdown-section-label">{group.label}</span>
-              {group.items.map((item) => {
-                const isItemActive =
-                  item.href !== null && currentPath.startsWith(item.href);
-                if (item.href === null) {
-                  return (
-                    <span
-                      key={item.label}
-                      className="nav-dropdown-item nav-dropdown-item--planned"
-                      role="menuitem"
-                      aria-disabled="true"
-                    >
-                      {item.label}
-                      <span className="nav-coming-badge" aria-label="Coming soon">
-                        Soon
-                      </span>
-                    </span>
-                  );
-                }
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`nav-dropdown-item${isItemActive ? " nav-dropdown-item--active" : ""}`}
-                    role="menuitem"
-                    onClick={() => setOpen(false)}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
+              {group.items.map((item) => (
+                <ToolMenuItem
+                  key={item.label}
+                  item={item}
+                  currentPath={currentPath}
+                  onSelect={handleClose}
+                />
+              ))}
             </div>
           ))}
         </div>
@@ -217,29 +274,63 @@ interface AllToolsMegaMenuProps {
 function AllToolsMegaMenu({ currentPath }: AllToolsMegaMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleMouseEnter = useCallback(() => setOpen(true), []);
-  const handleMouseLeave = useCallback(() => setOpen(false), []);
-  const handleToggle = useCallback(() => setOpen((v) => !v), []);
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Escape") setOpen(false);
+  const topCategories = NAV_GROUPS.slice(0, 6);
+  const bottomCategories = NAV_GROUPS.slice(6);
+
+  const handleMouseEnter = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    setOpen(true);
   }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    timeoutRef.current = setTimeout(() => {
+      setOpen(false);
+    }, 220);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    setOpen(false);
+  }, []);
+
+  const handleToggle = useCallback(() => setOpen((v) => !v), []);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Escape") handleClose();
+    },
+    [handleClose]
+  );
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
+        handleClose();
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, [open, handleClose]);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   return (
     <div
       ref={ref}
-      className="nav-group-wrapper"
+      className="nav-group-wrapper nav-group-wrapper--megamenu"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -269,42 +360,46 @@ function AllToolsMegaMenu({ currentPath }: AllToolsMegaMenuProps) {
       </button>
 
       {open && (
-        <div className="nav-megamenu" role="menu">
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label} className="nav-megamenu-col">
-              <span className="nav-dropdown-section-label">{group.label}</span>
-              {group.items.map((item) => {
-                const isActive =
-                  item.href !== null && currentPath.startsWith(item.href);
-                if (item.href === null) {
-                  return (
-                    <span
+        <div className="nav-megamenu-panel" role="menu">
+          {/* Top Row: 6 Columns */}
+          <div className="nav-megamenu-grid">
+            {topCategories.map((group) => (
+              <div key={group.label} className="nav-megamenu-col">
+                <span className="nav-dropdown-section-label">{group.label}</span>
+                <div className="nav-megamenu-list">
+                  {group.items.map((item) => (
+                    <ToolMenuItem
                       key={item.label}
-                      className="nav-dropdown-item nav-dropdown-item--planned"
-                      role="menuitem"
-                      aria-disabled="true"
-                    >
-                      {item.label}
-                      <span className="nav-coming-badge" aria-label="Coming soon">
-                        Soon
-                      </span>
-                    </span>
-                  );
-                }
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`nav-dropdown-item${isActive ? " nav-dropdown-item--active" : ""}`}
-                    role="menuitem"
-                    onClick={() => setOpen(false)}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
+                      item={item}
+                      currentPath={currentPath}
+                      onSelect={handleClose}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom Section: PDF Intelligence */}
+          {bottomCategories.length > 0 && (
+            <div className="nav-megamenu-bottom">
+              {bottomCategories.map((group) => (
+                <div key={group.label} className="nav-megamenu-col nav-megamenu-col--bottom">
+                  <span className="nav-dropdown-section-label">{group.label}</span>
+                  <div className="nav-megamenu-list nav-megamenu-list--row">
+                    {group.items.map((item) => (
+                      <ToolMenuItem
+                        key={item.label}
+                        item={item}
+                        currentPath={currentPath}
+                        onSelect={handleClose}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>
