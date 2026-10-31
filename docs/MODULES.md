@@ -23,6 +23,8 @@ Every module is a package `packages/mod-<id>` that exports:
 | `remove` | Remove Pages | organize | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
 | `organize` | Organize PDF | organize | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
 | `extract` | Extract Pages | organize | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
+| `jpg-to-pdf` | JPG to PDF | convert | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
+| `word-to-pdf` | Word to PDF | convert | client | `@cantoo/pdf-lib` + `jszip` | `@pdfkit/core` | Done |
 
 ## Planned Modules (Future Roadmap)
 
@@ -111,3 +113,13 @@ To protect client-side browsers and Web Workers from out-of-memory crashes, stri
 - **Upfront Validation**: Validated on file selection/drop via native `File.size` before reading data into memory (`arrayBuffer()`), as well as inside `runTool()` prior to worker dispatch.
 - **Sequential ArrayBuffer Reading**: Large batches read ArrayBuffers sequentially (`for ... of`) rather than concurrently (`Promise.all`) to avoid memory allocation spikes.
 - **PayloadLimitError**: Throws structured errors with `code: "FILE_TOO_LARGE" | "TOO_MANY_FILES" | "TOTAL_SIZE_TOO_LARGE"` detailing `limit`, `actual`, and offending `fileName`.
+
+### JPG to PDF Module (`packages/mod-jpg-to-pdf`)
+- **Image Conversion**: Converts one or multiple JPG or PNG images into PDF pages using `@cantoo/pdf-lib`.
+- **Custom Dimensions & Margins**: Supports fitting to native image dimensions, or scaling proportionally into standard A4 or US Letter page formats with configurable margins (None, Small, Large).
+- **Batch Processing**: Supports merging all images into a single continuous PDF document or generating individual single-page PDFs.
+
+### Word to PDF Module (`packages/mod-word-to-pdf`)
+- **Word Conversion**: Converts Word documents (`.docx`, `.doc`) and existing PDFs into PDF files in the browser using `@cantoo/pdf-lib` and `jszip`.
+- **Text & Paragraph Flow**: Extracts paragraphs from `word/document.xml`, word-wraps to fit the page width, and renders using standard Helvetica fonts.
+- **Rotation & Merge Options**: Supports per-file and global rotation (`0, 90, 180, 270`), page size (`a4` or `letter`), and optional `mergeAll` mode.

@@ -202,6 +202,52 @@ npx tsc --noEmit -p packages/mod-extract/tsconfig.json
 node --experimental-strip-types scripts/test-modules.mjs
 ```
 
+### `@pdfkit/mod-word-to-pdf` --- `packages/mod-word-to-pdf`
+
+**Word to PDF** · category: `convert` · backend: `client`
+
+Converts Word documents (`.docx`, `.doc`) and existing PDFs into PDF files, entirely in the browser. Supports per-file rotation, multi-file conversion, and optional merge-all mode. The DOCX parser is built with `jszip` and renders paragraphs using `@cantoo/pdf-lib` Helvetica fonts. For `.doc` or unrecognised formats, readable text is extracted from the raw binary as a fallback.
+
+| Detail | Value |
+|---|---|
+| Package | `@pdfkit/mod-word-to-pdf` |
+| Accepts | `.docx`, `.doc`, `.pdf` (multiple files) |
+| Options | `degrees` (global rotation: 0/90/180/270), `rotations` (per-file rotation map), `mergeAll` (boolean), `outputName` (string), `pageSize` ("a4" or "letter") |
+| Output | `<name>.pdf` per file, or `converted.pdf` (when `mergeAll: true`) |
+| Library | `@cantoo/pdf-lib` + `jszip` |
+| Depends on | `@pdfkit/core` |
+
+**Build / run independently:**
+
+```bash
+npx tsc --noEmit -p packages/mod-word-to-pdf/tsconfig.json
+node --experimental-strip-types scripts/test-modules.mjs
+```
+
+---
+
+### `@pdfkit/mod-jpg-to-pdf` â€” `packages/mod-jpg-to-pdf`
+
+**JPG to PDF** Â· category: `convert` Â· backend: `client`
+
+Convert JPG and PNG images into high-quality PDF documents with customizable page size, orientation, and margins.
+
+| Detail | Value |
+|---|---|
+| Package | `@pdfkit/mod-jpg-to-pdf` |
+| Accepts | `image/jpeg`, `image/png` (multiple files) |
+| Options | `pageSize` (`fit`, `a4`, `letter`), `orientation` (`auto`, `portrait`, `landscape`), `margin` (`none`, `small`, `large`), `mergeAll` (boolean), `outputName` (optional string) |
+| Output | `<name>.pdf` or `converted.pdf` |
+| Library | `@cantoo/pdf-lib` |
+| Depends on | `@pdfkit/core` |
+
+**Build / run independently:**
+
+```bash
+npx tsc --noEmit -p packages/mod-jpg-to-pdf/tsconfig.json
+node --experimental-strip-types scripts/test-modules.mjs
+```
+
 ---
 
 ## Planned Modules (Client-Side)

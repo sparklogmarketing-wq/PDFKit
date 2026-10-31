@@ -13,5 +13,7 @@ export default {
     "@pdfkit/mod-rotate",
     "@pdfkit/mod-organize",
     "@pdfkit/mod-extract",
+    "@pdfkit/mod-jpg-to-pdf",
+    "@pdfkit/mod-word-to-pdf",
   ],
 };

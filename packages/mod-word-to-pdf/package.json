@@ -1,0 +1,19 @@
+{
+  "name": "@pdfkit/mod-word-to-pdf",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./manifest": "./src/manifest.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types ../../scripts/test-modules.mjs"
+  },
+  "dependencies": {
+    "@pdfkit/core": "*",
+    "@cantoo/pdf-lib": "^2.3.0",
+    "jszip": "^3.10.2"
+  }
+}

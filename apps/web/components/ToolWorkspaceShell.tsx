@@ -11,6 +11,10 @@ export interface ToolWorkspaceShellProps {
   readonly fileInputRef: RefObject<HTMLInputElement | null>;
   readonly onFilesSelected: (files: FileList | null, append: boolean) => void;
   readonly allowMultiple?: boolean;
+  readonly accept?: string;
+  readonly emptyDropzoneText?: string;
+  readonly emptyDropzoneBadge?: string;
+  readonly compactDropzoneBadge?: string;
   readonly children?: ReactNode;
 }
 
@@ -22,6 +26,10 @@ export default function ToolWorkspaceShell({
   fileInputRef,
   onFilesSelected,
   allowMultiple = true,
+  accept = "application/pdf",
+  emptyDropzoneText,
+  emptyDropzoneBadge,
+  compactDropzoneBadge,
   children,
 }: ToolWorkspaceShellProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -51,6 +59,11 @@ export default function ToolWorkspaceShell({
   );
 
   if (filesCount === 0) {
+    const defaultText = allowMultiple
+      ? "Choose PDF files, or drag and drop here"
+      : "Choose a PDF file, or drag and drop here";
+    const defaultBadge = allowMultiple ? "Multiple files (.pdf)" : "Single PDF file (.pdf)";
+
     return (
       <div className="tool-runner-panel workspace-empty-panel">
         <input
@@ -58,7 +71,7 @@ export default function ToolWorkspaceShell({
           type="file"
           hidden
           multiple={allowMultiple}
-          accept="application/pdf"
+          accept={accept}
           onChange={(e) => {
             onFilesSelected(e.target.files, false);
             e.target.value = "";
@@ -71,8 +84,8 @@ export default function ToolWorkspaceShell({
           onDragLeave={onDragLeave}
           onDrop={onDrop}
           onClick={() => fileInputRef.current?.click()}
-          primaryText={allowMultiple ? "Choose PDF files, or drag and drop here" : "Choose a PDF file, or drag and drop here"}
-          badgeText={allowMultiple ? "Multiple files (.pdf)" : "Single PDF file (.pdf)"}
+          primaryText={emptyDropzoneText ?? defaultText}
+          badgeText={emptyDropzoneBadge ?? defaultBadge}
         />
 
         {warning && !error && (
@@ -90,6 +103,8 @@ export default function ToolWorkspaceShell({
     );
   }
 
+  const defaultCompactBadge = `${filesCount} ${filesCount === 1 ? "PDF" : "PDFs"} selected (${totalPages} pages total)`;
+
   return (
     <div className="workspace-root">
       <input
@@ -97,7 +112,7 @@ export default function ToolWorkspaceShell({
         type="file"
         hidden
         multiple={allowMultiple}
-        accept="application/pdf"
+        accept={accept}
         onChange={(e) => {
           onFilesSelected(e.target.files, allowMultiple);
           e.target.value = "";
@@ -112,7 +127,7 @@ export default function ToolWorkspaceShell({
           onDragLeave={onDragLeave}
           onDrop={onDrop}
           onClick={() => fileInputRef.current?.click()}
-          badgeText={`${filesCount} ${filesCount === 1 ? "PDF" : "PDFs"} selected (${totalPages} pages total)`}
+          badgeText={compactDropzoneBadge ?? defaultCompactBadge}
         />
       )}
 
