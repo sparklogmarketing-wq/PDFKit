@@ -539,17 +539,17 @@ export default function WordToPdfTool() {
   );
 
   /* ── Rotation Controls (Individual on Each Selected File) ─── */
-  const handleRotateFile = useCallback((index: number) => {
-    setFiles((currentFiles) => {
-      const file = currentFiles[index];
-      if (!file) return currentFiles;
+  const handleRotateFile = useCallback(
+    (index: number) => {
+      const file = files[index];
+      if (!file) return;
       setFileRotations((prev) => ({
         ...prev,
         [file.name]: ((prev[file.name] ?? 0) + 90) % 360,
       }));
-      return currentFiles;
-    });
-  }, []);
+    },
+    [files]
+  );
 
   const handleRotateAll = useCallback(() => {
     setFileRotations((prev) => {
@@ -562,10 +562,9 @@ export default function WordToPdfTool() {
   }, [files]);
 
   /* ── Remove File Control on Each Selected File ─────────────── */
-  const removeFile = useCallback((index: number) => {
-    setFiles((prev) => {
-      const target = prev[index];
-      const next = prev.filter((_, i) => i !== index);
+  const removeFile = useCallback(
+    (index: number) => {
+      const target = files[index];
       if (target) {
         setFileRotations((r) => {
           const copy = { ...r };
@@ -573,9 +572,10 @@ export default function WordToPdfTool() {
           return copy;
         });
       }
-      return next;
-    });
-  }, []);
+      setFiles((prev) => prev.filter((_, i) => i !== index));
+    },
+    [files]
+  );
 
   /* ── Reorder by Name (A-Z) Option ─────────────────────────── */
   const handleSortAlphabetical = useCallback(() => {
