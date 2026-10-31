@@ -62,6 +62,14 @@ export const toolComponentMap: Record<string, ComponentType<any>> = {
     ssr: false,
     loading: ToolLoadingSkeleton,
   }),
+  "jpg-to-pdf": dynamic(() => import("../components/JpgToPdfTool"), {
+    ssr: false,
+    loading: ToolLoadingSkeleton,
+  }),
+  "png-to-pdf": dynamic(() => import("../components/JpgToPdfTool"), {
+    ssr: false,
+    loading: ToolLoadingSkeleton,
+  }),
 };
 
 // Generic ToolRunner fallback is also loaded dynamically so it is not bundled into the route chunk

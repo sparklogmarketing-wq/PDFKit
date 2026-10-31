@@ -204,6 +204,30 @@ node --experimental-strip-types scripts/test-modules.mjs
 
 ---
 
+### `@pdfkit/mod-jpg-to-pdf` — `packages/mod-jpg-to-pdf`
+
+**JPG to PDF** · category: `convert` · backend: `client`
+
+Convert JPG and PNG images into high-quality PDF documents with customizable page size, orientation, and margins.
+
+| Detail | Value |
+|---|---|
+| Package | `@pdfkit/mod-jpg-to-pdf` |
+| Accepts | `image/jpeg`, `image/png` (multiple files) |
+| Options | `pageSize` (`fit`, `a4`, `letter`), `orientation` (`auto`, `portrait`, `landscape`), `margin` (`none`, `small`, `large`), `mergeAll` (boolean), `outputName` (optional string) |
+| Output | `<name>.pdf` or `converted.pdf` |
+| Library | `@cantoo/pdf-lib` |
+| Depends on | `@pdfkit/core` |
+
+**Build / run independently:**
+
+```bash
+npx tsc --noEmit -p packages/mod-jpg-to-pdf/tsconfig.json
+node --experimental-strip-types scripts/test-modules.mjs
+```
+
+---
+
 ## Planned Modules (Client-Side)
 
 All modules below run entirely in the browser via Web Workers — **zero server involvement**. The client-side library stack is:

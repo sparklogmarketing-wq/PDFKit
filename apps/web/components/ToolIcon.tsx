@@ -36,6 +36,15 @@ export function ToolIcon({ id, size = 24 }: { readonly id: string; readonly size
           <path d="M14 17h7m-3-3l3 3-3 3" />
         </svg>
       );
+    case "jpg-to-pdf":
+    case "png-to-pdf":
+      return (
+        <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <polyline points="21 15 16 10 5 21" />
+        </svg>
+      );
     case "extract":
       return (
         <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

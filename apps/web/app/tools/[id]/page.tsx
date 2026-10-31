@@ -11,7 +11,11 @@ import { getToolMetadataById } from "../../../lib/toolMetadata";
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return manifests.map((m) => ({ id: m.id }));
+  const ids = manifests.map((m) => m.id);
+  if (!ids.includes("png-to-pdf")) {
+    ids.push("png-to-pdf");
+  }
+  return ids.map((id) => ({ id }));
 }
 
 export async function generateMetadata({
@@ -25,7 +29,8 @@ export async function generateMetadata({
 
 export default async function ToolPage({ params }: { readonly params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const manifest = manifests.find((m) => m.id === id);
+  const canonicalId = id === "png-to-pdf" ? "jpg-to-pdf" : id;
+  const manifest = manifests.find((m) => m.id === canonicalId);
   if (!manifest) notFound();
 
   const categoryLabel = manifest.category;

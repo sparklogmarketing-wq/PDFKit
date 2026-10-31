@@ -13,6 +13,7 @@
     "@pdfkit/mod-extract": "*",
     "@pdfkit/mod-merge": "*",
     "@pdfkit/mod-organize": "*",
+    "@pdfkit/mod-jpg-to-pdf": "*",
     "@pdfkit/mod-remove": "*",
     "@pdfkit/mod-rotate": "*",
     "@pdfkit/mod-split": "*",

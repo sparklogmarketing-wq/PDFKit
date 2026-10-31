@@ -21,6 +21,7 @@ import rotateMod from "../packages/mod-rotate/src/index.ts";
 import removeMod from "../packages/mod-remove/src/index.ts";
 import organizeMod, { reinsertBlanksAtRelativePositions } from "../packages/mod-organize/src/index.ts";
 import extractMod from "../packages/mod-extract/src/index.ts";
+import jpgToPdfMod from "../packages/mod-jpg-to-pdf/src/index.ts";
 import "./test-cancellation.mjs";
 import "./test-pdf-cache-perf.mjs";
 import "./test-stale-async.mjs";

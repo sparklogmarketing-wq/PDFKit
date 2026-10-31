@@ -5,9 +5,10 @@ import { manifest as rotate } from "@pdfkit/mod-rotate/manifest";
 import { manifest as remove } from "@pdfkit/mod-remove/manifest";
 import { manifest as organize } from "@pdfkit/mod-organize/manifest";
 import { manifest as extract } from "@pdfkit/mod-extract/manifest";
+import { manifest as jpgToPdf } from "@pdfkit/mod-jpg-to-pdf/manifest";
 
 // The ONE file that wires modules into the app. Adding a tool = 2 lines here.
-export const manifests: ToolManifest[] = [merge, split, rotate, remove, organize, extract];
+export const manifests: ToolManifest[] = [merge, split, rotate, remove, organize, extract, jpgToPdf];
 
 /** Heavy code is loaded lazily, only when a tool runs. */
 export const loaders: Record<string, () => Promise<{ default: ToolModule<any> }>> = {
@@ -17,4 +18,6 @@ export const loaders: Record<string, () => Promise<{ default: ToolModule<any> }>
   remove: () => import("@pdfkit/mod-remove"),
   organize: () => import("@pdfkit/mod-organize"),
   extract: () => import("@pdfkit/mod-extract"),
+  "jpg-to-pdf": () => import("@pdfkit/mod-jpg-to-pdf"),
+  "png-to-pdf": () => import("@pdfkit/mod-jpg-to-pdf"),
 };

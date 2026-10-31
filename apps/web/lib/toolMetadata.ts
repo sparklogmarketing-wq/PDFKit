@@ -27,6 +27,7 @@ export function getToolMetadata(manifest: ToolManifest | undefined): Metadata {
  * Resolves tool manifest by ID and returns generated metadata.
  */
 export function getToolMetadataById(id: string): Metadata {
-  const manifest = manifests.find((m) => m.id === id);
+  const canonicalId = id === "png-to-pdf" ? "jpg-to-pdf" : id;
+  const manifest = manifests.find((m) => m.id === canonicalId);
   return getToolMetadata(manifest);
 }
