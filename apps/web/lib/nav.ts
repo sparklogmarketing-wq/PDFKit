@@ -106,8 +106,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Convert to PDF",
     items: [
-      { label: "JPG to PDF",        href: "/tools/jpg-to-pdf", iconId: "jpg-to-pdf" },
-      { label: "Word to PDF",       href: null, iconId: "word-to-pdf" },
+      { label: "JPG to PDF",        href: "/tools/jpg-to-pdf",  iconId: "jpg-to-pdf" },
+      { label: "Word to PDF",       href: "/tools/word-to-pdf", iconId: "word-to-pdf" },
       { label: "PowerPoint to PDF", href: null, iconId: "powerpoint-to-pdf" },
       { label: "Excel to PDF",      href: null, iconId: "excel-to-pdf" },
       { label: "HTML to PDF",       href: null, iconId: "html-to-pdf" },

@@ -22,6 +22,8 @@ import removeMod from "../packages/mod-remove/src/index.ts";
 import organizeMod, { reinsertBlanksAtRelativePositions } from "../packages/mod-organize/src/index.ts";
 import extractMod from "../packages/mod-extract/src/index.ts";
 import jpgToPdfMod from "../packages/mod-jpg-to-pdf/src/index.ts";
+import wordToPdfMod from "../packages/mod-word-to-pdf/src/index.ts";
+import JSZipModule from "jszip";
 import "./test-cancellation.mjs";
 import "./test-pdf-cache-perf.mjs";
 import "./test-stale-async.mjs";
@@ -1867,5 +1869,136 @@ test("Payload limits and memory warnings (Issue #29)", async (t) => {
     assert.match(overResult.error, /oversized\.pdf/);
     assert.match(overResult.error, /100 MB/);
     assert.equal(overResult.valid.length, 0);
+  });
+});
+
+
+async function createSampleDocx(paragraphs = ["Hello Word to PDF!"]) {
+  const JSZip = JSZipModule.default ?? JSZipModule;
+  const zip = new JSZip();
+  const xmlBody = paragraphs
+    .map((p) => `<w:p><w:r><w:t>${p}</w:t></w:r></w:p>`)
+    .join("");
+  const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${xmlBody}</w:body></w:document>`;
+  zip.file("word/document.xml", docXml);
+  return await zip.generateAsync({ type: "uint8array" });
+}
+
+test("Word to PDF module (packages/mod-word-to-pdf)", async (t) => {
+  await t.test("rejects empty input files array", async () => {
+    const dummyCtx = { onProgress: () => {}, signal: new AbortController().signal };
+    await assert.rejects(
+      () => wordToPdfMod.run([], {}, dummyCtx),
+      (err) => err instanceof ToolError && /required/i.test(err.message)
+    );
+  });
+
+  await t.test("converts a single DOCX document to PDF", async () => {
+    const docxData = await createSampleDocx(["Title Heading", "This is converted body paragraph text."]);
+    const progressUpdates = [];
+    const ctx = {
+      onProgress: (p) => progressUpdates.push(p),
+      signal: new AbortController().signal,
+    };
+
+    const outputs = await wordToPdfMod.run(
+      [{ name: "sample-doc.docx", data: docxData }],
+      {},
+      ctx
+    );
+
+    assert.equal(outputs.length, 1);
+    assert.equal(outputs[0].name, "sample-doc.pdf");
+    assert.equal(outputs[0].mime, "application/pdf");
+    assert.ok(outputs[0].data.length > 0);
+
+    const pdfDoc = await PDFDocument.load(outputs[0].data);
+    assert.ok(pdfDoc.getPageCount() >= 1);
+    assert.ok(progressUpdates.length > 0);
+    assert.equal(progressUpdates[progressUpdates.length - 1], 1.0);
+  });
+
+  await t.test("converts multiple DOCX files and applies per-file rotations", async () => {
+    const docx1 = await createSampleDocx(["Document One content"]);
+    const docx2 = await createSampleDocx(["Document Two content"]);
+
+    const outputs = await wordToPdfMod.run(
+      [
+        { name: "first.docx", data: docx1 },
+        { name: "second.docx", data: docx2 },
+      ],
+      {
+        rotations: {
+          "first.docx": 90,
+          "second.docx": 180,
+        },
+      },
+      { onProgress: () => {}, signal: new AbortController().signal }
+    );
+
+    assert.equal(outputs.length, 2);
+    assert.equal(outputs[0].name, "first.pdf");
+    assert.equal(outputs[1].name, "second.pdf");
+
+    const pdf1 = await PDFDocument.load(outputs[0].data);
+    assert.equal(pdf1.getPage(0).getRotation().angle, 90);
+
+    const pdf2 = await PDFDocument.load(outputs[1].data);
+    assert.equal(pdf2.getPage(0).getRotation().angle, 180);
+  });
+
+  await t.test("merges all converted files into a single combined PDF when mergeAll: true", async () => {
+    const docx1 = await createSampleDocx(["Section 1: Introduction"]);
+    const docx2 = await createSampleDocx(["Section 2: Conclusion"]);
+
+    const outputs = await wordToPdfMod.run(
+      [
+        { name: "intro.docx", data: docx1 },
+        { name: "outro.docx", data: docx2 },
+      ],
+      { mergeAll: true, outputName: "combined_report.pdf" },
+      { onProgress: () => {}, signal: new AbortController().signal }
+    );
+
+    assert.equal(outputs.length, 1);
+    assert.equal(outputs[0].name, "combined_report.pdf");
+
+    const mergedDoc = await PDFDocument.load(outputs[0].data);
+    assert.ok(mergedDoc.getPageCount() >= 2);
+  });
+
+  await t.test("supports existing PDF input files alongside DOCX and preserves/rotates pages", async () => {
+    const samplePdf = await createSamplePdf(2);
+    const docx = await createSampleDocx(["Supplementary Word notes"]);
+
+    const outputs = await wordToPdfMod.run(
+      [
+        { name: "original.pdf", data: samplePdf },
+        { name: "notes.docx", data: docx },
+      ],
+      { degrees: 90 },
+      { onProgress: () => {}, signal: new AbortController().signal }
+    );
+
+    assert.equal(outputs.length, 2);
+    const pdf1 = await PDFDocument.load(outputs[0].data);
+    assert.equal(pdf1.getPageCount(), 2);
+    assert.equal(pdf1.getPage(0).getRotation().angle, 90);
+  });
+
+  await t.test("aborts immediately when signal is cancelled", async () => {
+    const docx = await createSampleDocx(["Some content"]);
+    const controller = new AbortController();
+    controller.abort();
+
+    await assert.rejects(
+      () =>
+        wordToPdfMod.run(
+          [{ name: "doc.docx", data: docx }],
+          {},
+          { onProgress: () => {}, signal: controller.signal }
+        ),
+      (err) => err instanceof ToolError && (/cancelled/i.test(err.message) || /aborted/i.test(err.message))
+    );
   });
 });

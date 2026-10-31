@@ -17,6 +17,7 @@
     "@pdfkit/mod-remove": "*",
     "@pdfkit/mod-rotate": "*",
     "@pdfkit/mod-split": "*",
+    "@pdfkit/mod-word-to-pdf": "*",
     "jszip": "^3.10.2",
     "next": "^15.0.0",
     "pdfjs-dist": "^4.10.38",
