@@ -1,6 +1,6 @@
-/* ==========================================================================
-   PDFKit — White & Purple Design System
-   Inspired by ilovepdf.com — clean, crisp, professional.
+﻿/* ==========================================================================
+   PDFKit â€” White & Purple Design System
+   Inspired by ilovepdf.com â€” clean, crisp, professional.
    ========================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -9,7 +9,7 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* ── White & Purple Palette ── */
+  /* â”€â”€ White & Purple Palette â”€â”€ */
   --bg-page:             #f5f3ff;
   --bg-surface:          #ffffff;
   --bg-surface-elevated: #ffffff;
@@ -59,7 +59,7 @@
   --transition-normal: 220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Dark theme removed — white & purple only */
+/* Dark theme removed â€” white & purple only */
 
 /* ==========================================================================
    Base & Reset
@@ -199,6 +199,199 @@ a {
   background-color: var(--primary-subtle);
   color: var(--primary);
   font-weight: 600;
+}
+
+
+/* ==========================================================================
+   Mega-menu dropdown groups
+   ========================================================================== */
+
+.nav-group-wrapper {
+  position: relative;
+}
+
+.nav-group-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.75rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-full);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  font-family: inherit;
+}
+
+.nav-group-trigger:hover,
+.nav-group-trigger:focus-visible {
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+  outline: none;
+}
+
+.nav-group-trigger--active {
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.nav-group-chevron {
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.nav-group-trigger[aria-expanded="true"] .nav-group-chevron {
+  transform: rotate(180deg);
+}
+
+.nav-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  background: #fff;
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 32px rgba(124, 58, 237, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 0.375rem;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: dropdown-in 0.13s ease;
+}
+
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nav-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 450;
+  color: var(--text-main);
+  text-decoration: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.nav-dropdown-item:hover {
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+}
+
+.nav-dropdown-item--active {
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.nav-dropdown-item--planned {
+  color: var(--text-muted);
+  cursor: default;
+  font-weight: 400;
+}
+
+.nav-dropdown-item--planned:hover {
+  background-color: transparent;
+  color: var(--text-muted);
+}
+
+/* "Soon" badge — contrast-safe: #4c3d6e on #ede9fe = 5.1:1 */
+.nav-coming-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  background: #ede9fe;
+  color: #4c3d6e;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+/* Bold nav links (Merge, Split, Compress) */
+.nav-link--bold {
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Muted / disabled nav link (coming soon) */
+.nav-link--muted {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.nav-link--muted:hover {
+  background-color: transparent;
+  color: var(--text-muted);
+}
+
+/* Section label inside dropdown */
+.nav-dropdown-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-dropdown-section + .nav-dropdown-section {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-light);
+}
+
+.nav-dropdown-section-label {
+  display: block;
+  padding: 0.2rem 0.75rem 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Mega-menu: wide multi-column panel anchored to the right */
+.nav-megamenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 0.5rem 1.25rem;
+  background: #fff;
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px rgba(124, 58, 237, 0.13), 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 1rem;
+  z-index: 200;
+  min-width: 700px;
+  animation: dropdown-in 0.13s ease;
+}
+
+/* Stack last group (PDF Intelligence) below row 1 — it lives alone */
+.nav-megamenu-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 /* Nav search bar */
@@ -1015,7 +1208,7 @@ a {
   display: block;
 }
 
-/* ── Pure Page Preview Lightbox ── */
+/* â”€â”€ Pure Page Preview Lightbox â”€â”€ */
 .pdf-zoom-clean-wrapper {
   position: relative;
   display: flex;
@@ -1580,7 +1773,7 @@ a {
 }
 
 /* ==========================================================================
-   Split Tool — iLovePDF-style two-pane layout
+   Split Tool â€” iLovePDF-style two-pane layout
    ========================================================================== */
 
 .split-tool-wrap {
@@ -1878,7 +2071,7 @@ a {
 
 
 
-/* ── Pages Mode Styles (iLovePDF Extract Mode) ── */
+/* â”€â”€ Pages Mode Styles (iLovePDF Extract Mode) â”€â”€ */
 
 .split-mode-tabs.three-tabs {
   grid-template-columns: 1fr 1fr 1fr;
@@ -1982,7 +2175,7 @@ a {
   margin-top: 1px;
 }
 
-/* ── Selectable Page Thumbnails Grid ── */
+/* â”€â”€ Selectable Page Thumbnails Grid â”€â”€ */
 .split-pages-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(80px, 88px));
@@ -2103,7 +2296,7 @@ a {
   background: #d1fae5;
 }
 
-/* ── Extract Pages Tool Styles ── */
+/* â”€â”€ Extract Pages Tool Styles â”€â”€ */
 .extract-pages-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(82px, 92px));
@@ -2213,7 +2406,7 @@ a {
   color: #ffffff;
 }
 
-/* ── Size Mode Unit Toggle ── */
+/* â”€â”€ Size Mode Unit Toggle â”€â”€ */
 .size-unit-toggle {
   display: inline-flex;
   background: #f1f5f9;
@@ -2240,7 +2433,7 @@ a {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* ── 2-Column Workspace Layouts (Rotate, Merge & Remove) ── */
+/* â”€â”€ 2-Column Workspace Layouts (Rotate, Merge & Remove) â”€â”€ */
 .merge-workspace-layout,
 .rotate-workspace-layout,
 .remove-workspace-layout {
@@ -2260,7 +2453,7 @@ a {
   }
 }
 
-/* ── Shared 2-Column Panels ── */
+/* â”€â”€ Shared 2-Column Panels â”€â”€ */
 .tool-left-panel {
   background: var(--bg-surface);
   border: 1.5px solid var(--border-light);
@@ -2333,7 +2526,7 @@ a {
   box-shadow: none;
 }
 
-/* ── Remove Tool Page Card Styles ── */
+/* â”€â”€ Remove Tool Page Card Styles â”€â”€ */
 .remove-pages-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -2397,7 +2590,7 @@ a {
   z-index: 2;
 }
 
-/* ── Remove Tool Final Confirmation Modal ── */
+/* â”€â”€ Remove Tool Final Confirmation Modal â”€â”€ */
 .confirm-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -2459,7 +2652,7 @@ a {
   border-top: 1px solid var(--border-light);
 }
 
-/* ── Organize PDF Tool Styles (iLovePDF Style) ── */
+/* â”€â”€ Organize PDF Tool Styles (iLovePDF Style) â”€â”€ */
 
 .organize-main-panel {
   background: #ffffff;

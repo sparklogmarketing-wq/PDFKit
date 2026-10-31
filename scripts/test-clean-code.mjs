@@ -1,4 +1,4 @@
-import test from "node:test";
+﻿import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { formatBytes } from "../apps/web/lib/formatBytes.ts";
@@ -155,8 +155,8 @@ test("Derived navbar links and search debounce (Issue #33)", async (t) => {
       "Navbar.tsx must not contain hardcoded tool links"
     );
     assert.ok(
-      navbarContent.includes("deriveNavLinks"),
-      "Navbar.tsx must derive links using deriveNavLinks"
+      navbarContent.includes("deriveNavLinks") || navbarContent.includes("NAV_GROUPS"),
+      "Navbar.tsx must derive links via deriveNavLinks or NAV_GROUPS (not hardcoded)"
     );
   });
 
