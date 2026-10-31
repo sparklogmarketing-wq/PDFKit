@@ -1,4 +1,4 @@
-﻿import type { ToolManifest } from "@pdfkit/core";
+import type { ToolManifest } from "@pdfkit/core";
 import { manifests } from "./registry.ts";
 
 export const SEARCH_DEBOUNCE_MS = 300;
@@ -107,7 +107,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Convert to PDF",
     items: [
       { label: "JPG to PDF",        href: null, iconId: "jpg-to-pdf" },
-      { label: "Word to PDF",       href: null, iconId: "word-to-pdf" },
+      { label: "Word to PDF",       href: "/tools/word-to-pdf", iconId: "word-to-pdf" },
       { label: "PowerPoint to PDF", href: null, iconId: "powerpoint-to-pdf" },
       { label: "Excel to PDF",      href: null, iconId: "excel-to-pdf" },
       { label: "HTML to PDF",       href: null, iconId: "html-to-pdf" },

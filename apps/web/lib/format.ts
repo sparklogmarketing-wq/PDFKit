@@ -26,6 +26,15 @@ export function filterPdfFiles(files: FileList | File[] | null): File[] {
   return Array.from(files).filter((f) => f.name.toLowerCase().endsWith(".pdf"));
 }
 
+export function filterWordAndPdfFiles(files: FileList | File[] | null): File[] {
+  if (!files || files.length === 0) return [];
+  const validExts = [".docx", ".doc", ".pdf", ".txt"];
+  return Array.from(files).filter((f) => {
+    const lower = f.name.toLowerCase();
+    return validExts.some((ext) => lower.endsWith(ext));
+  });
+}
+
 export function isSameFile(
   a: { readonly name: string; readonly size?: number; readonly lastModified?: number },
   b: { readonly name: string; readonly size?: number; readonly lastModified?: number }

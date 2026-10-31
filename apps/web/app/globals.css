@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    PDFKit â€” White & Purple Design System
    Inspired by ilovepdf.com â€” clean, crisp, professional.
    ========================================================================== */
@@ -3910,4 +3910,186 @@ a {
   gap: 0.35rem;
   box-shadow: 0 2px 6px rgba(124, 58, 237, 0.08);
   transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+
+/* ── Word to PDF Tool Styles ────────────────────────────────── */
+.word-thumb-sheet {
+  width: 100px;
+  height: 140px;
+  background-color: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  position: relative;
+  transition: transform 0.3s ease;
+  transform-origin: center center;
+  flex-shrink: 0;
+}
+
+.word-thumb-sheet.rot-0 {
+  transform: rotate(0deg);
+}
+
+.word-thumb-sheet.rot-90 {
+  transform: rotate(90deg);
+}
+
+.word-thumb-sheet.rot-180 {
+  transform: rotate(180deg);
+}
+
+.word-thumb-sheet.rot-270 {
+  transform: rotate(270deg);
+}
+
+.pdf-thumb-sheet-wrapper {
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.word-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 4px;
+  background-color: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.word-card-rot-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 4px;
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+}
+
+.word-card-preview-icon {
+  width: 48px;
+  height: 48px;
+  color: #2563eb;
+}
+
+.word-card-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 80%;
+}
+
+.word-card-line {
+  height: 4px;
+  border-radius: 2px;
+  background-color: #e2e8f0;
+}
+
+.word-card-line.short {
+  width: 60%;
+}
+
+.word-card-footer {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+
+.word-card-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.word-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+
+/* ── Word to PDF: Output Mode Toggle ───────────────────────────── */
+.word-output-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.word-output-mode-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.word-output-mode-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.word-output-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-light);
+  background-color: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.word-output-mode-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background-color: var(--primary-subtle);
+}
+
+.word-output-mode-btn.active {
+  border-color: var(--primary);
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.word-output-mode-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Summary badge for combined mode */
+.word-combine-badge {
+  color: var(--primary);
 }

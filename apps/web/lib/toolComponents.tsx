@@ -62,6 +62,10 @@ export const toolComponentMap: Record<string, ComponentType<any>> = {
     ssr: false,
     loading: ToolLoadingSkeleton,
   }),
+  "word-to-pdf": dynamic(() => import("../components/WordToPdfTool"), {
+    ssr: false,
+    loading: ToolLoadingSkeleton,
+  }),
 };
 
 // Generic ToolRunner fallback is also loaded dynamically so it is not bundled into the route chunk

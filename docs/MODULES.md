@@ -23,6 +23,7 @@ Every module is a package `packages/mod-<id>` that exports:
 | `remove` | Remove Pages | organize | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
 | `organize` | Organize PDF | organize | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
 | `extract` | Extract Pages | organize | client | `@cantoo/pdf-lib` | `@pdfkit/core` | Done |
+| `word-to-pdf` | Word to PDF | convert | client | `@cantoo/pdf-lib` + `jszip` | `@pdfkit/core` | Done |
 
 ## Planned Modules (Future Roadmap)
 
